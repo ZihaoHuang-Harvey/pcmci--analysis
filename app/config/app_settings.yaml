@@ -1,0 +1,42 @@
+defaults:
+  tau_min: 0
+  tau_max: 3
+  pc_alpha: 0.05
+  quantile_range:
+    - 25
+    - 75
+  output_dir: outputs
+  result_file_name: pcmci_results.pkl
+  log_level: INFO
+  default_data_path: combined_all_with_dem(内插结果)_sin_cos_filtered.xlsx
+role_templates:
+  time_driver:
+    variable_names:
+      - date_sin
+      - date_cos
+    description: 自动识别为时间驱动变量，无入边，可向外影响普通变量。
+  terrain_driver:
+    variable_names:
+      - elevation_mean
+      - slope_mean
+      - aspect_mean
+    description: 自动识别为地形驱动变量，无入边，可向外影响普通变量。
+  regular:
+    variable_names: []
+    description: 默认普通变量。
+advanced_rules:
+  block_target:
+    description: 禁止其他变量影响目标变量，通常用于特殊先验。
+    rules: []
+  block_source:
+    description: 禁止某个变量向外影响其他变量，适合只想保留其被解释角色的场景。
+    rules: []
+  block_specific_edge:
+    description: 仅屏蔽一条特定方向关系，不影响其他边。
+    rules: []
+help_text:
+  step_data: 第 1 步：加载数据并决定哪些列不参与分析。程序只会把数值列送入 PCMCI，非数值列会自动忽略。
+  step_roles: 第 2 步：设置变量角色。通常只需确认自动识别出的时间驱动和地形驱动是否正确；其余变量保持普通变量即可。
+  step_run: 第 3 步：调整常用参数并运行分析。确认常用参数后即可运行 PCMCI+ 和 TE 分析。
+  step_results: 第 4 步：查看结果摘要、因果图、时间序列图和矩阵导出。结果页会同步展示本次参数和角色设置。
+  advanced_rules: 高级边约束面向已有明确先验的用户。若你不熟悉 no_in / no_out / no_link，保持默认不设置通常更稳妥。
