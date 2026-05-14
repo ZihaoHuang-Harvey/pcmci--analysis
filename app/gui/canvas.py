@@ -6,6 +6,7 @@ matplotlib.use("Qt5Agg")
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from PyQt5.QtCore import pyqtSignal
 
 from app.gui.result_plotting import THEME_COLORS
 
@@ -16,7 +17,9 @@ class CanvasWidget(FigureCanvas):
     单独抽出这一层，是为了避免控制器里直接操作 Figure 创建细节。
     """
 
-    def __init__(self, parent=None, width: int = 8, height: int = 6, dpi: int = 100):
+    double_clicked = pyqtSignal(object, str)  # (canvas_widget, title)
+
+    def __init__(self, parent=None, width: int = 8, height: int = 6, dpi: int = 100, title: str = ""):
         self.fig = Figure(
             figsize=(width, height),
             dpi=dpi,
@@ -27,6 +30,12 @@ class CanvasWidget(FigureCanvas):
         self.setParent(parent)
         self.axes = self.fig.add_subplot(111)
         self.axes.set_facecolor(THEME_COLORS["surface_alt"])
+        self._popup_title = title
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        if event.button() == 1:  # 左键双击
+            self.double_clicked.emit(self, self._popup_title)
+        super().mouseDoubleClickEvent(event)
 
     def clear_figure(self) -> None:
         self.fig.clear()

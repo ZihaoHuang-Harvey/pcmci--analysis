@@ -6,6 +6,7 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import pandas as pd
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
@@ -17,6 +18,7 @@ from PyQt5.QtWidgets import (
     QFileDialog,
     QDoubleSpinBox,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -155,7 +157,7 @@ class MainWindow(QMainWindow):
             self.step1_next_button,
             self.step2_next_button,
             self.run_analysis_button,
-            self.export_mci_button,
+            self.export_result_button,
         ):
             button.setProperty("primary", True)
             button.style().unpolish(button)
@@ -485,28 +487,26 @@ class MainWindow(QMainWindow):
         self.results_summary_text.setMaximumHeight(100)
         layout.addWidget(self.results_summary_text)
 
-        algo_result_tabs = QTabWidget()
-        layout.addWidget(algo_result_tabs, stretch=1)
+        self.algo_result_tabs = QTabWidget()
+        layout.addWidget(self.algo_result_tabs, stretch=1)
 
         pcmci_result_page = QWidget()
         pcmci_result_layout = QVBoxLayout(pcmci_result_page)
         pcmci_result_layout.addWidget(self._build_pcmci_result_panel())
-        algo_result_tabs.addTab(pcmci_result_page, "PCMCI+ 结果")
+        self.algo_result_tabs.addTab(pcmci_result_page, "PCMCI+ 结果")
 
         te_result_page = QWidget()
         te_result_layout = QVBoxLayout(te_result_page)
         te_result_layout.addWidget(self._build_te_result_panel())
-        algo_result_tabs.addTab(te_result_page, "TE 结果")
+        self.algo_result_tabs.addTab(te_result_page, "TE 结果")
 
         action_layout = QHBoxLayout()
         self.step4_prev_button = QPushButton("返回参数设置")
-        self.export_mci_button = QPushButton("导出 MCI 矩阵")
-        self.export_te_button = QPushButton("导出 TE 结果")
-        self.export_te_button.setEnabled(False)
+        self.export_result_button = QPushButton("导出 PCMCI+ 结果")
+        self.export_result_button.setEnabled(False)
         action_layout.addWidget(self.step4_prev_button)
         action_layout.addStretch(1)
-        action_layout.addWidget(self.export_mci_button)
-        action_layout.addWidget(self.export_te_button)
+        action_layout.addWidget(self.export_result_button)
         layout.addLayout(action_layout)
         return page
 
@@ -524,43 +524,40 @@ class MainWindow(QMainWindow):
         """
         container = QWidget()
         container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(0, 0, 0, 0)
-        container_layout.setSpacing(4)
+        container_layout.setContentsMargins(2, 2, 2, 2)
+        container_layout.setSpacing(2)
         
-        # 缩放控制工具栏
+        # 缩放控制工具栏（紧凑布局）
         toolbar = QHBoxLayout()
-        toolbar.setSpacing(8)
-        
-        zoom_label = QLabel("缩放:")
-        zoom_label.setStyleSheet("color: #666; font-size: 12px;")
-        toolbar.addWidget(zoom_label)
+        toolbar.setSpacing(4)
+        toolbar.setContentsMargins(4, 2, 4, 2)
         
         zoom_out_btn = QPushButton("−")
-        zoom_out_btn.setFixedSize(30, 26)
-        zoom_out_btn.setToolTip("缩小 (20%)")
+        zoom_out_btn.setFixedSize(24, 22)
+        zoom_out_btn.setToolTip("缩小")
         toolbar.addWidget(zoom_out_btn)
         
         zoom_slider = QSlider(Qt.Horizontal)
         zoom_slider.setMinimum(50)
         zoom_slider.setMaximum(300)
         zoom_slider.setValue(100)
-        zoom_slider.setMaximumWidth(150)
+        zoom_slider.setMaximumWidth(120)
         zoom_slider.setToolTip("拖动调整缩放比例")
         toolbar.addWidget(zoom_slider)
         
         zoom_in_btn = QPushButton("+")
-        zoom_in_btn.setFixedSize(30, 26)
-        zoom_in_btn.setToolTip("放大 (20%)")
+        zoom_in_btn.setFixedSize(24, 22)
+        zoom_in_btn.setToolTip("放大")
         toolbar.addWidget(zoom_in_btn)
         
         reset_btn = QPushButton("重置")
-        reset_btn.setFixedSize(50, 26)
+        reset_btn.setFixedSize(40, 22)
         reset_btn.setToolTip("重置为100%")
         toolbar.addWidget(reset_btn)
         
         self.zoom_value_label = QLabel("100%")
-        self.zoom_value_label.setStyleSheet("color: #666; font-size: 12px;")
-        self.zoom_value_label.setMinimumWidth(45)
+        self.zoom_value_label.setStyleSheet("color: #888; font-size: 11px;")
+        self.zoom_value_label.setMinimumWidth(40)
         toolbar.addWidget(self.zoom_value_label)
         
         toolbar.addStretch()
@@ -572,14 +569,15 @@ class MainWindow(QMainWindow):
         scroll.setAlignment(Qt.AlignCenter)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setFrameShape(QFrame.NoFrame)
         
         inner_page = QWidget()
         inner_page.setFixedSize(base_width, base_height)
         inner_layout = QVBoxLayout(inner_page)
-        inner_layout.setContentsMargins(8, 8, 8, 8)
+        inner_layout.setContentsMargins(4, 4, 4, 4)
         inner_layout.setSpacing(0)
         
-        content_widget.setFixedSize(base_width - 16, base_height - 16)
+        content_widget.setFixedSize(base_width - 8, base_height - 8)
         inner_layout.addWidget(content_widget)
         scroll.setWidget(inner_page)
         container_layout.addWidget(scroll, stretch=1)
@@ -617,51 +615,56 @@ class MainWindow(QMainWindow):
     def _build_pcmci_result_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
 
         control_group = QGroupBox("PCMCI+ 结果图控制")
-        control_layout = QVBoxLayout(control_group)
+        control_layout = QHBoxLayout(control_group)
+        control_layout.setContentsMargins(8, 20, 8, 8)
 
-        target_row = QHBoxLayout()
-        target_row.addWidget(QLabel("目标变量"))
+        control_layout.addWidget(QLabel("目标变量:"))
         self.target_variable_combo = QComboBox()
         self.target_variable_combo.setEnabled(False)
-        target_row.addWidget(self.target_variable_combo, stretch=1)
-        control_layout.addLayout(target_row)
+        self.target_variable_combo.setMinimumWidth(120)
+        control_layout.addWidget(self.target_variable_combo)
 
-        checkbox_row = QHBoxLayout()
-        self.only_target_edges_checkbox = QCheckBox("仅显示指向目标变量的边")
+        control_layout.addSpacing(20)
+
+        self.only_target_edges_checkbox = QCheckBox("仅指向目标")
         self.only_target_edges_checkbox.setChecked(False)
-        self.only_related_vars_checkbox = QCheckBox("仅显示与目标变量相关的变量")
+        self.only_related_vars_checkbox = QCheckBox("仅相关变量")
         self.only_related_vars_checkbox.setChecked(True)
-        self.hide_historical_contemporaneous_checkbox = QCheckBox("隐藏历史同期边")
+        self.hide_historical_contemporaneous_checkbox = QCheckBox("隐藏同期边")
         self.hide_historical_contemporaneous_checkbox.setChecked(False)
-        self.hide_ambiguous_edges_checkbox = QCheckBox("隐藏未决断因果边")
+        self.hide_ambiguous_edges_checkbox = QCheckBox("隐藏未决断边")
         self.hide_ambiguous_edges_checkbox.setChecked(False)
-        checkbox_row.addWidget(self.only_target_edges_checkbox)
-        checkbox_row.addWidget(self.only_related_vars_checkbox)
-        checkbox_row.addWidget(self.hide_historical_contemporaneous_checkbox)
-        checkbox_row.addWidget(self.hide_ambiguous_edges_checkbox)
-        checkbox_row.addStretch(1)
-        control_layout.addLayout(checkbox_row)
+        control_layout.addWidget(self.only_target_edges_checkbox)
+        control_layout.addWidget(self.only_related_vars_checkbox)
+        control_layout.addWidget(self.hide_historical_contemporaneous_checkbox)
+        control_layout.addWidget(self.hide_ambiguous_edges_checkbox)
+        control_layout.addStretch(1)
         layout.addWidget(control_group)
 
         self.pcmci_result_tabs = QTabWidget()
-        self.pcmci_result_tabs.setMinimumHeight(500)
+        self.pcmci_result_tabs.setMinimumHeight(400)
         layout.addWidget(self.pcmci_result_tabs, stretch=1)
 
         # 因果图页面（带缩放）
-        self.graph_canvas = CanvasWidget(None, width=10, height=7)
-        graph_view = self._create_scalable_view(self.graph_canvas, base_width=700, base_height=500, tab_label="因果图")
+        self.graph_canvas = CanvasWidget(None, width=8, height=5.5, title="PCMCI+ 因果图")
+        self.graph_canvas.double_clicked.connect(self._show_figure_popup)
+        graph_view = self._create_scalable_view(self.graph_canvas, base_width=560, base_height=400, tab_label="因果图")
         self.pcmci_result_tabs.addTab(graph_view, "因果图")
 
         # 时间序列图页面（带缩放）
-        self.ts_graph_canvas = CanvasWidget(None, width=12, height=7)
-        ts_view = self._create_scalable_view(self.ts_graph_canvas, base_width=800, base_height=500, tab_label="时间序列图")
+        self.ts_graph_canvas = CanvasWidget(None, width=10, height=5.5, title="PCMCI+ 时间序列图")
+        self.ts_graph_canvas.double_clicked.connect(self._show_figure_popup)
+        ts_view = self._create_scalable_view(self.ts_graph_canvas, base_width=640, base_height=400, tab_label="时间序列图")
         self.pcmci_result_tabs.addTab(ts_view, "时间序列图")
 
         # 目标变量上游影响图页面（带缩放）
-        self.target_graph_canvas = CanvasWidget(None, width=10, height=7)
-        target_view = self._create_scalable_view(self.target_graph_canvas, base_width=700, base_height=500, tab_label="目标变量上游影响图")
+        self.target_graph_canvas = CanvasWidget(None, width=8, height=5.5, title="PCMCI+ 目标变量上游影响图")
+        self.target_graph_canvas.double_clicked.connect(self._show_figure_popup)
+        target_view = self._create_scalable_view(self.target_graph_canvas, base_width=560, base_height=400, tab_label="目标变量上游影响图")
         self.pcmci_result_tabs.addTab(target_view, "目标变量上游影响图")
 
         # 滞后邻接矩阵页面（带缩放）
@@ -699,7 +702,8 @@ class MainWindow(QMainWindow):
         te_graph_scroll.setWidgetResizable(True)
         te_graph_page = QWidget()
         te_graph_layout = QVBoxLayout(te_graph_page)
-        self.te_graph_canvas = CanvasWidget(te_graph_page, width=10, height=7)
+        self.te_graph_canvas = CanvasWidget(te_graph_page, width=10, height=7, title="TE 结果图")
+        self.te_graph_canvas.double_clicked.connect(self._show_figure_popup)
         te_graph_layout.addWidget(self.te_graph_canvas)
         te_graph_scroll.setWidget(te_graph_page)
         self.te_result_tabs.addTab(te_graph_scroll, "TE 结果图")
@@ -748,7 +752,8 @@ class MainWindow(QMainWindow):
         te_bar_scroll.setWidgetResizable(True)
         te_bar_page = QWidget()
         te_bar_layout = QVBoxLayout(te_bar_page)
-        self.te_bar_canvas = CanvasWidget(te_bar_page, width=14, height=9)
+        self.te_bar_canvas = CanvasWidget(te_bar_page, width=14, height=9, title="TE 柱状图")
+        self.te_bar_canvas.double_clicked.connect(self._show_figure_popup)
         te_bar_layout.addWidget(self.te_bar_canvas)
         te_bar_scroll.setWidget(te_bar_page)
         self.te_result_tabs.addTab(te_bar_scroll, "TE 柱状图")
@@ -783,8 +788,8 @@ class MainWindow(QMainWindow):
         self.run_te_button.clicked.connect(self.run_te_only)
 
         self.step4_prev_button.clicked.connect(lambda: self.step_tabs.setCurrentIndex(2))
-        self.export_mci_button.clicked.connect(self.export_mci_matrix)
-        self.export_te_button.clicked.connect(self.export_te_result)
+        self.export_result_button.clicked.connect(self._show_export_dialog)
+        self.algo_result_tabs.currentChanged.connect(self._update_export_button_text)
         self.target_variable_combo.currentIndexChanged.connect(self.refresh_target_dependent_graphs)
         self.only_target_edges_checkbox.toggled.connect(self.plot_time_series_graph)
 
@@ -1451,8 +1456,6 @@ class MainWindow(QMainWindow):
 
         self._plot_te_bar_graph(max_te_matrix, max_ndte_matrix, var_names)
 
-        self.export_te_button.setEnabled(True)
-
     def _plot_te_result_graph(self, max_te_matrix: np.ndarray, max_ndte_matrix: np.ndarray, var_names: list[str]) -> None:
         fig = self.te_graph_canvas.fig
         fig.clear()
@@ -1562,6 +1565,364 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "错误", f"导出失败：{exc}")
 
+    def _show_figure_popup(self, canvas: CanvasWidget, title: str) -> None:
+        """双击图表后弹出大窗口显示。"""
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title or "查看图表")
+        dialog.resize(1200, 900)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(8, 8, 8, 8)
+
+        # 复制 figure，避免与原画布共享同一对象
+        import pickle
+        fig_copy = pickle.loads(pickle.dumps(canvas.fig))
+
+        popup_canvas = FigureCanvas(fig_copy)
+        popup_canvas.draw()
+        layout.addWidget(popup_canvas, stretch=1)
+
+        # 底部按钮
+        btn_layout = QHBoxLayout()
+        save_btn = QPushButton("保存图片")
+        save_btn.clicked.connect(lambda: self._save_popup_figure(fig_copy, title))
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(dialog.accept)
+        btn_layout.addStretch(1)
+        btn_layout.addWidget(save_btn)
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
+
+        dialog.exec_()
+
+    def _save_popup_figure(self, fig, default_name: str) -> None:
+        """从弹窗中保存图片。"""
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "保存图片", f"{default_name}.png",
+            "PNG Files (*.png);;PDF Files (*.pdf);;SVG Files (*.svg)",
+        )
+        if not file_path:
+            return
+        try:
+            fig.savefig(file_path, dpi=200, bbox_inches="tight")
+            QMessageBox.information(self, "完成", f"图片已保存到：\n{file_path}")
+        except Exception as exc:
+            QMessageBox.critical(self, "错误", f"保存失败：{exc}")
+
+    def _update_export_button_text(self, tab_index: int) -> None:
+        """根据当前结果标签页更新导出按钮文本和启用状态。"""
+
+        if tab_index == 0:
+            # PCMCI+ 结果标签页
+            self.export_result_button.setText("导出 PCMCI+ 结果")
+            self.export_result_button.setEnabled(self.current_result is not None)
+        elif tab_index == 1:
+            # TE 结果标签页
+            self.export_result_button.setText("导出 TE 结果")
+            self.export_result_button.setEnabled(self.current_te_result is not None)
+
+    def _show_export_dialog(self) -> None:
+        """显示导出结果对话框，让用户选择要导出的内容。"""
+
+        current_tab = self.algo_result_tabs.currentIndex()
+        if current_tab == 0:
+            self._show_pcmci_export_dialog()
+        elif current_tab == 1:
+            self._show_te_export_dialog()
+
+    def _show_pcmci_export_dialog(self) -> None:
+        """显示 PCMCI+ 结果导出对话框。"""
+
+        if self.current_result is None:
+            QMessageBox.warning(self, "提示", "没有可导出的 PCMCI+ 分析结果。")
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("导出 PCMCI+ 结果")
+        dialog.setMinimumWidth(400)
+        layout = QVBoxLayout(dialog)
+
+        # 标题
+        title_label = QLabel("请选择要导出的 PCMCI+ 结果：")
+        title_label.setStyleSheet("font-weight: bold; font-size: 13px;")
+        layout.addWidget(title_label)
+
+        # 各类结果的复选框
+        checkboxes: dict[str, QCheckBox] = {}
+        options = [
+            ("adj_matrix", "滞后邻接矩阵", True),
+            ("val_matrix", "val 矩阵（条件独立性值）", False),
+            ("p_matrix", "p 值矩阵", False),
+            ("mci_matrix", "MCI 矩阵（跨滞后期最大值）", True),
+            ("graph_image", "因果图（图片）", False),
+            ("ts_graph_image", "时间序列图（图片）", False),
+            ("target_graph_image", "目标变量上游影响图（图片）", False),
+        ]
+
+        for key, label, default_checked in options:
+            cb = QCheckBox(label)
+            cb.setChecked(default_checked)
+            checkboxes[key] = cb
+            layout.addWidget(cb)
+
+        # 格式选择
+        format_layout = QHBoxLayout()
+        format_layout.addWidget(QLabel("导出格式："))
+        format_combo = QComboBox()
+        format_combo.addItem("Excel (.xlsx)", "xlsx")
+        format_combo.addItem("CSV (.csv)", "csv")
+        format_layout.addWidget(format_combo)
+        layout.addLayout(format_layout)
+
+        # 按钮
+        button_layout = QHBoxLayout()
+        cancel_btn = QPushButton("取消")
+        cancel_btn.clicked.connect(dialog.reject)
+        export_btn = QPushButton("导出")
+        export_btn.setDefault(True)
+        button_layout.addStretch(1)
+        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(export_btn)
+        layout.addLayout(button_layout)
+
+        def on_export():
+            selected = {k: cb.isChecked() for k, cb in checkboxes.items()}
+            if not any(selected.values()):
+                QMessageBox.warning(dialog, "提示", "请至少选择一项要导出的内容。")
+                return
+            dialog.accept()
+            self._do_export_pcmci(selected, format_combo.currentData())
+
+        export_btn.clicked.connect(on_export)
+        dialog.exec_()
+
+    def _do_export_pcmci(self, selections: dict[str, bool], fmt: str) -> None:
+        """执行 PCMCI+ 结果导出。"""
+
+        has_data = any(selections.get(k) for k in ("adj_matrix", "val_matrix", "p_matrix", "mci_matrix"))
+        has_images = any(selections.get(k) for k in ("graph_image", "ts_graph_image", "target_graph_image"))
+
+        # 根据是否有数据文件，决定文件对话框类型
+        save_dir: Path | None = None
+        data_file_path: Path | None = None
+        if has_data:
+            file_filter = "Excel Files (*.xlsx)" if fmt == "xlsx" else "CSV Files (*.csv)"
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "导出 PCMCI+ 数据", "", file_filter,
+            )
+            if not file_path:
+                return
+            data_file_path = Path(file_path)
+            save_dir = data_file_path.parent
+        elif has_images:
+            dir_path = QFileDialog.getExistingDirectory(self, "选择图片保存目录")
+            if not dir_path:
+                return
+            save_dir = Path(dir_path)
+        else:
+            return
+
+        try:
+            result = self.current_result
+            var_names = result.var_names
+            saved_files: list[str] = []
+
+            # 导出数据矩阵
+            data_dict: dict[str, pd.DataFrame] = {}
+            if selections.get("adj_matrix"):
+                data_dict["滞后邻接矩阵"] = pd.DataFrame(
+                    result.adj_matrix, index=var_names, columns=var_names,
+                )
+            if selections.get("val_matrix"):
+                data_dict["val矩阵"] = pd.DataFrame(
+                    np.max(result.val_matrix[:, :, 1:], axis=2),
+                    index=var_names, columns=var_names,
+                )
+            if selections.get("p_matrix"):
+                data_dict["p值矩阵"] = pd.DataFrame(
+                    np.min(result.p_matrix[:, :, 1:], axis=2),
+                    index=var_names, columns=var_names,
+                )
+            if selections.get("mci_matrix"):
+                data_dict["MCI矩阵"] = pd.DataFrame(
+                    self._build_mci_summary_matrix(),
+                    index=var_names, columns=var_names,
+                )
+
+            if data_dict and data_file_path:
+                if fmt == "csv":
+                    for name, df in data_dict.items():
+                        csv_path = data_file_path.parent / f"{data_file_path.stem}_{name}.csv"
+                        df.to_csv(csv_path)
+                        saved_files.append(str(csv_path))
+                else:
+                    with pd.ExcelWriter(data_file_path, engine="openpyxl") as writer:
+                        for name, df in data_dict.items():
+                            df.to_excel(writer, sheet_name=name[:31])
+                    saved_files.append(str(data_file_path))
+
+            # 导出图片
+            image_exports = {
+                "graph_image": ("PCMCI+_因果图", self.graph_canvas),
+                "ts_graph_image": ("PCMCI+_时间序列图", self.ts_graph_canvas),
+                "target_graph_image": ("PCMCI+_目标变量上游影响图", self.target_graph_canvas),
+            }
+            for key, (name, canvas) in image_exports.items():
+                if selections.get(key):
+                    img_path = save_dir / f"{name}.png"
+                    canvas.fig.savefig(str(img_path), dpi=150, bbox_inches="tight")
+                    saved_files.append(str(img_path))
+
+            QMessageBox.information(
+                self, "完成",
+                f"PCMCI+ 结果已导出：\n\n" + "\n".join(f"  {f}" for f in saved_files),
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "错误", f"导出失败：{exc}")
+
+    def _show_te_export_dialog(self) -> None:
+        """显示 TE 结果导出对话框。"""
+
+        if self.current_te_result is None:
+            QMessageBox.warning(self, "提示", "没有可导出的 TE 分析结果。")
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("导出 TE 结果")
+        dialog.setMinimumWidth(400)
+        layout = QVBoxLayout(dialog)
+
+        # 标题
+        title_label = QLabel("请选择要导出的 TE 结果：")
+        title_label.setStyleSheet("font-weight: bold; font-size: 13px;")
+        layout.addWidget(title_label)
+
+        # 各类结果的复选框
+        checkboxes: dict[str, QCheckBox] = {}
+        options = [
+            ("te_matrix", "TE 矩阵", True),
+            ("ndte_matrix", "NDTE 矩阵", True),
+            ("significant_pairs", "显著 TE 变量对", True),
+            ("te_graph_image", "TE 结果图（图片）", False),
+            ("te_bar_image", "TE 柱状图（图片）", False),
+        ]
+
+        for key, label, default_checked in options:
+            cb = QCheckBox(label)
+            cb.setChecked(default_checked)
+            checkboxes[key] = cb
+            layout.addWidget(cb)
+
+        # 格式选择
+        format_layout = QHBoxLayout()
+        format_layout.addWidget(QLabel("导出格式："))
+        format_combo = QComboBox()
+        format_combo.addItem("Excel (.xlsx)", "xlsx")
+        format_combo.addItem("CSV (.csv)", "csv")
+        format_layout.addWidget(format_combo)
+        layout.addLayout(format_layout)
+
+        # 按钮
+        button_layout = QHBoxLayout()
+        cancel_btn = QPushButton("取消")
+        cancel_btn.clicked.connect(dialog.reject)
+        export_btn = QPushButton("导出")
+        export_btn.setDefault(True)
+        button_layout.addStretch(1)
+        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(export_btn)
+        layout.addLayout(button_layout)
+
+        def on_export():
+            selected = {k: cb.isChecked() for k, cb in checkboxes.items()}
+            if not any(selected.values()):
+                QMessageBox.warning(dialog, "提示", "请至少选择一项要导出的内容。")
+                return
+            dialog.accept()
+            self._do_export_te(selected, format_combo.currentData())
+
+        export_btn.clicked.connect(on_export)
+        dialog.exec_()
+
+    def _do_export_te(self, selections: dict[str, bool], fmt: str) -> None:
+        """执行 TE 结果导出。"""
+
+        has_data = any(selections.get(k) for k in ("te_matrix", "ndte_matrix", "significant_pairs"))
+        has_images = any(selections.get(k) for k in ("te_graph_image", "te_bar_image"))
+
+        # 根据是否有数据文件，决定文件对话框类型
+        save_dir: Path | None = None
+        data_file_path: Path | None = None
+        if has_data:
+            file_filter = "Excel Files (*.xlsx)" if fmt == "xlsx" else "CSV Files (*.csv)"
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "导出 TE 数据", "", file_filter,
+            )
+            if not file_path:
+                return
+            data_file_path = Path(file_path)
+            save_dir = data_file_path.parent
+        elif has_images:
+            dir_path = QFileDialog.getExistingDirectory(self, "选择图片保存目录")
+            if not dir_path:
+                return
+            save_dir = Path(dir_path)
+        else:
+            return
+
+        try:
+            te_result = self.current_te_result
+            var_names = te_result.var_names
+            tau_max = te_result.config.tau_max
+
+            max_te = np.max(te_result.te_matrix[:, :, 1:], axis=2) if tau_max >= 1 else np.zeros((len(var_names), len(var_names)))
+            max_ndte = np.max(te_result.ndte_matrix[:, :, 1:], axis=2) if tau_max >= 1 else np.zeros((len(var_names), len(var_names)))
+            saved_files: list[str] = []
+
+            # 准备矩阵数据
+            data_dict: dict[str, pd.DataFrame] = {}
+            if selections.get("te_matrix"):
+                data_dict["TE矩阵"] = pd.DataFrame(max_te, index=var_names, columns=var_names)
+            if selections.get("ndte_matrix"):
+                data_dict["NDTE矩阵"] = pd.DataFrame(max_ndte, index=var_names, columns=var_names)
+            if selections.get("significant_pairs") and te_result.significant_pairs:
+                data_dict["显著变量对"] = pd.DataFrame(
+                    te_result.significant_pairs,
+                    columns=["源变量", "目标变量", "滞后期", "TE值", "NDTE值"],
+                )
+
+            if data_dict and data_file_path:
+                if fmt == "csv":
+                    for name, df in data_dict.items():
+                        csv_path = data_file_path.parent / f"{data_file_path.stem}_{name}.csv"
+                        df.to_csv(csv_path, index=name != "显著变量对")
+                        saved_files.append(str(csv_path))
+                else:
+                    with pd.ExcelWriter(data_file_path, engine="openpyxl") as writer:
+                        for name, df in data_dict.items():
+                            df.to_excel(writer, sheet_name=name[:31], index=name != "显著变量对")
+                    saved_files.append(str(data_file_path))
+
+            # 导出图片
+            image_exports = {
+                "te_graph_image": ("TE_结果图", self.te_graph_canvas),
+                "te_bar_image": ("TE_柱状图", self.te_bar_canvas),
+            }
+            for key, (name, canvas) in image_exports.items():
+                if selections.get(key):
+                    img_path = save_dir / f"{name}.png"
+                    canvas.fig.savefig(str(img_path), dpi=150, bbox_inches="tight")
+                    saved_files.append(str(img_path))
+
+            QMessageBox.information(
+                self, "完成",
+                f"TE 结果已导出：\n\n" + "\n".join(f"  {f}" for f in saved_files),
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "错误", f"导出失败：{exc}")
+
     def _save_result_payload(self, result: AnalysisResult) -> Path:
         output_dir = self.project_root / self.app_config.defaults.output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -1637,6 +1998,9 @@ class MainWindow(QMainWindow):
         if hasattr(self, "run_te_button"):
             self.run_te_button.setEnabled(has_analysis_vars and not worker_running)
 
+        # 更新导出按钮状态
+        self._update_export_button_text(self.algo_result_tabs.currentIndex())
+
     def _clear_result_views(self) -> None:
         self.results_summary_text.clear()
         self.adj_table.clear()
@@ -1668,7 +2032,6 @@ class MainWindow(QMainWindow):
         self.ndte_matrix_table.setColumnCount(0)
         self.te_table.setRowCount(0)
         self.te_hint_label.setText("TE 分析结果将在启用 TE 并完成分析后显示。")
-        self.export_te_button.setEnabled(False)
 
         self._refresh_tab_state()
 
