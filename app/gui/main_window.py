@@ -1577,12 +1577,15 @@ class MainWindow(QMainWindow):
 
         # 复制 figure，避免与原画布共享同一对象
         import pickle
+        from matplotlib.patches import FancyArrowPatch
         fig_copy = pickle.loads(pickle.dumps(canvas.fig))
 
-        # 放大弹窗中所有文字的字体大小（原始字体较小，弹窗放大后需要相应放大）
+        # 放大弹窗中所有文字的字体大小和线条粗细
         font_scale = 1.6
-        line_width_scale = 1.8
+        line_width_scale = 2.0
+        marker_scale = 1.8
         for ax in fig_copy.axes:
+            # 放大文字
             for text_obj in ax.texts:
                 current_size = text_obj.get_fontsize()
                 if current_size is not None and current_size > 0:
@@ -1603,20 +1606,42 @@ class MainWindow(QMainWindow):
                     current_size = axis_label.get_fontsize()
                     if current_size is not None and current_size > 0:
                         axis_label.set_fontsize(current_size * font_scale)
+
+            # 放大普通线条
             for line in ax.lines:
                 current_lw = line.get_linewidth()
-                line.set_linewidth(current_lw * line_width_scale)
+                line.set_linewidth(max(1.0, current_lw * line_width_scale))
+                # 同时放大数据点标记大小
+                ms = line.get_markersize()
+                if ms and ms > 0:
+                    line.set_markersize(ms * marker_scale)
+                mew = line.get_markeredgewidth()
+                if mew and mew > 0:
+                    line.set_markeredgewidth(mew * line_width_scale)
+
+            # 放大 FancyArrowPatch (箭头) 和其他 patch
             for patch in ax.patches:
-                if hasattr(patch, 'set_linewidth'):
-                    current_lw = patch.get_linewidth()
-                    patch.set_linewidth(max(0.5, current_lw * line_width_scale))
-            for child in ax.get_children():
-                if hasattr(child, 'get_linewidth') and hasattr(child, 'set_linewidth'):
+                if isinstance(patch, FancyArrowPatch):
+                    lw = patch.get_linewidth()
+                    patch.set_linewidth(max(1.5, lw * line_width_scale))
+                    # 放大箭头头部
                     try:
-                        current_lw = child.get_linewidth()
-                        child.set_linewidth(max(0.5, current_lw * line_width_scale))
+                        mutation_scale = patch.get_mutation_scale()
+                        if mutation_scale:
+                            patch.set_mutation_scale(mutation_scale * 1.6)
                     except Exception:
                         pass
+                elif hasattr(patch, 'set_linewidth'):
+                    lw = patch.get_linewidth()
+                    patch.set_linewidth(max(0.8, lw * line_width_scale))
+                    # 尝试放大标记/符号
+                    if hasattr(patch, 'set_markersize'):
+                        try:
+                            ms = patch.get_markersize()
+                            if ms and ms > 0:
+                                patch.set_markersize(ms * marker_scale)
+                        except Exception:
+                            pass
 
         popup_canvas = FigureCanvas(fig_copy)
         popup_canvas.draw()
