@@ -1581,6 +1581,7 @@ class MainWindow(QMainWindow):
 
         # 放大弹窗中所有文字的字体大小（原始字体较小，弹窗放大后需要相应放大）
         font_scale = 1.6
+        line_width_scale = 1.8
         for ax in fig_copy.axes:
             for text_obj in ax.texts:
                 current_size = text_obj.get_fontsize()
@@ -1602,6 +1603,20 @@ class MainWindow(QMainWindow):
                     current_size = axis_label.get_fontsize()
                     if current_size is not None and current_size > 0:
                         axis_label.set_fontsize(current_size * font_scale)
+            for line in ax.lines:
+                current_lw = line.get_linewidth()
+                line.set_linewidth(current_lw * line_width_scale)
+            for patch in ax.patches:
+                if hasattr(patch, 'set_linewidth'):
+                    current_lw = patch.get_linewidth()
+                    patch.set_linewidth(max(0.5, current_lw * line_width_scale))
+            for child in ax.get_children():
+                if hasattr(child, 'get_linewidth') and hasattr(child, 'set_linewidth'):
+                    try:
+                        current_lw = child.get_linewidth()
+                        child.set_linewidth(max(0.5, current_lw * line_width_scale))
+                    except Exception:
+                        pass
 
         popup_canvas = FigureCanvas(fig_copy)
         popup_canvas.draw()
