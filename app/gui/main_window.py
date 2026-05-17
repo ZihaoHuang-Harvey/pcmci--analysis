@@ -671,14 +671,14 @@ class MainWindow(QMainWindow):
         self.adj_table = QTableWidget()
         self.adj_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.adj_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        adj_view = self._create_scalable_view(self.adj_table, base_width=600, base_height=450, tab_label="滞后邻接矩阵")
+        adj_view = self._create_scalable_view(self.adj_table, base_width=1000, base_height=450, tab_label="滞后邻接矩阵")
         self.pcmci_result_tabs.addTab(adj_view, "滞后邻接矩阵")
 
         # MCI 矩阵页面（带缩放）
         self.mci_table = QTableWidget()
         self.mci_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.mci_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        mci_view = self._create_scalable_view(self.mci_table, base_width=600, base_height=450, tab_label="MCI 矩阵")
+        mci_view = self._create_scalable_view(self.mci_table, base_width=1000, base_height=450, tab_label="MCI 矩阵")
         self.pcmci_result_tabs.addTab(mci_view, "MCI 矩阵")
 
         return panel
@@ -1578,6 +1578,30 @@ class MainWindow(QMainWindow):
         # 复制 figure，避免与原画布共享同一对象
         import pickle
         fig_copy = pickle.loads(pickle.dumps(canvas.fig))
+
+        # 放大弹窗中所有文字的字体大小（原始字体较小，弹窗放大后需要相应放大）
+        font_scale = 1.6
+        for ax in fig_copy.axes:
+            for text_obj in ax.texts:
+                current_size = text_obj.get_fontsize()
+                if current_size is not None and current_size > 0:
+                    text_obj.set_fontsize(current_size * font_scale)
+            for label in ax.get_xticklabels() + ax.get_yticklabels():
+                current_size = label.get_fontsize()
+                if current_size is not None and current_size > 0:
+                    label.set_fontsize(current_size * font_scale)
+            ax_title = ax.title
+            if ax_title:
+                current_size = ax_title.get_fontsize()
+                if current_size is not None and current_size > 0:
+                    ax_title.set_fontsize(current_size * font_scale)
+            x_label = ax.xaxis.label
+            y_label = ax.yaxis.label
+            for axis_label in [x_label, y_label]:
+                if axis_label:
+                    current_size = axis_label.get_fontsize()
+                    if current_size is not None and current_size > 0:
+                        axis_label.set_fontsize(current_size * font_scale)
 
         popup_canvas = FigureCanvas(fig_copy)
         popup_canvas.draw()

@@ -1,4 +1,4 @@
-# Causal analysis tool
+# Causal analysis system
 
 多方法交互因果分析平台 - 基于 PCMCI+ 和转移熵(Transfer Entropy)的因果关系发现与可视化工具
 
