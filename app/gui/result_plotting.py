@@ -965,18 +965,14 @@ def draw_mci_bar_chart(
 
     target_idx = var_names.index(target_name)
     source_indices = list(range(len(var_names)))
-    source_names = [var_names[i] for i in source_indices]
 
-    positive_mcis: list[float] = []
-    negative_mcis: list[float] = []
-
-    positive_labels: list[str] = []
-    negative_labels: list[str] = []
-
-    best_pos_taus: list[int] = []
-    best_neg_taus: list[int] = []
+    display_names: list[str] = []
+    mci_values: list[float] = []
+    bar_labels: list[str] = []
+    bar_colors: list[str] = []
 
     for src_idx in source_indices:
+        name = var_names[src_idx]
         best_pos_val = 0.0
         best_neg_val = 0.0
         best_pos_label = ""
@@ -1011,43 +1007,25 @@ def draw_mci_bar_chart(
                 best_neg_label = f"{tau0_val:.3f}"
                 best_neg_tau = 0
 
-        positive_mcis.append(best_pos_val)
-        negative_mcis.append(abs(best_neg_val))
-        positive_labels.append(best_pos_label)
-        negative_labels.append(best_neg_label)
-        best_pos_taus.append(best_pos_tau)
-        best_neg_taus.append(best_neg_tau)
+        if best_pos_tau >= 0:
+            display_names.append(f"{name} (+t{best_pos_tau})" if best_pos_tau > 0 else f"{name} (+t0)")
+            mci_values.append(best_pos_val)
+            bar_labels.append(best_pos_label)
+            bar_colors.append(THEME_COLORS["accent"])
 
-    x = np.arange(len(source_names))
-    width = 0.35
+        if best_neg_tau >= 0:
+            display_names.append(f"{name} (-t{best_neg_tau})" if best_neg_tau > 0 else f"{name} (-t0)")
+            mci_values.append(abs(best_neg_val))
+            bar_labels.append(best_neg_label)
+            bar_colors.append(THEME_COLORS["negative"])
 
-    display_names: list[str] = []
-    for i, name in enumerate(source_names):
-        pos_tau = best_pos_taus[i]
-        neg_tau = best_neg_taus[i]
-        tau_parts = []
-        if pos_tau >= 0:
-            tau_parts.append(f"+t{pos_tau}" if pos_tau > 0 else "+t0")
-        if neg_tau >= 0:
-            tau_parts.append(f"-t{neg_tau}" if neg_tau > 0 else "-t0")
-        if tau_parts:
-            display_names.append(f"{name} ({', '.join(tau_parts)})")
-        else:
-            display_names.append(name)
+    x = np.arange(len(display_names))
+    width = 0.7
 
     font_prop = get_chinese_font_properties()
-    bars_pos = ax.bar(x - width / 2, positive_mcis, width, label="Positive MCI",
-                      color=THEME_COLORS["accent"], alpha=0.85, edgecolor="white", linewidth=0.6)
-    bars_neg = ax.bar(x + width / 2, negative_mcis, width, label="Negative MCI",
-                      color=THEME_COLORS["negative"], alpha=0.85, edgecolor="white", linewidth=0.6)
+    bars = ax.bar(x, mci_values, width, color=bar_colors, alpha=0.85, edgecolor="white", linewidth=0.6)
 
-    for bar, label_text in zip(bars_pos, positive_labels):
-        if label_text and float(label_text) > 0.01:
-            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
-                    label_text, ha="center", va="bottom", fontsize=7.5,
-                    fontproperties=font_prop)
-
-    for bar, label_text in zip(bars_neg, negative_labels):
+    for bar, label_text in zip(bars, bar_labels):
         if label_text and abs(float(label_text)) > 0.01:
             ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
                     label_text, ha="center", va="bottom", fontsize=7.5,
@@ -1055,10 +1033,16 @@ def draw_mci_bar_chart(
 
     ax.set_xticks(x)
     ax.set_xticklabels(display_names, rotation=45, ha='right', fontsize=7.5, fontproperties=font_prop)
+
     ax.set_ylabel("MCI", fontsize=10, fontproperties=font_prop)
     ax.set_title(f"各变量对「{target_name}」的 MCI 值", fontsize=11, fontweight="bold",
                  fontproperties=font_prop, pad=10)
-    ax.legend(loc="upper right", fontsize=9, framealpha=0.9)
+
+    legend_elements = [
+        Patch(facecolor=THEME_COLORS["accent"], alpha=0.85, edgecolor="white", linewidth=0.6, label="Positive MCI"),
+        Patch(facecolor=THEME_COLORS["negative"], alpha=0.85, edgecolor="white", linewidth=0.6, label="Negative MCI")
+    ]
+    ax.legend(handles=legend_elements, loc="upper right", fontsize=9, framealpha=0.9)
     ax.set_ylim(bottom=0)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
