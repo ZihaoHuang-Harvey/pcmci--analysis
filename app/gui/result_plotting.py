@@ -8,7 +8,7 @@ import numpy as np
 from matplotlib import colors, font_manager
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import LinearSegmentedColormap, Normalize
-from matplotlib.patches import Circle, FancyArrowPatch
+from matplotlib.patches import Circle, FancyArrowPatch, Patch
 
 
 # 小米橙主题色板。
