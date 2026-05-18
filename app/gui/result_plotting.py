@@ -964,7 +964,7 @@ def draw_mci_bar_chart(
         raise ValueError(f"目标变量 {target_name} 不在分析结果中。")
 
     target_idx = var_names.index(target_name)
-    source_indices = [i for i in range(len(var_names)) if i != target_idx]
+    source_indices = list(range(len(var_names)))
     source_names = [var_names[i] for i in source_indices]
 
     positive_mcis: list[float] = []
@@ -994,7 +994,7 @@ def draw_mci_bar_chart(
 
         tau0_val = float(val_matrix[src_idx, target_idx, 0])
         tau0_p = float(p_matrix[src_idx, target_idx, 0])
-        if tau0_p <= pc_alpha:
+        if src_idx != target_idx and tau0_p <= pc_alpha:
             if tau0_val > 0 and tau0_val > best_pos_val:
                 best_pos_val = tau0_val
                 best_pos_label = f"{tau0_val:.3f}"
