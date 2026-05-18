@@ -1051,6 +1051,7 @@ def draw_mci_bar_chart(
                     fontproperties=font_prop)
 
     ax.set_xticks(x)
+    ax.set_xticklabels(display_names)
     for tick in ax.get_xticklabels():
         tick.set_fontproperties(font_prop)
         tick.set_fontsize(7.5)
