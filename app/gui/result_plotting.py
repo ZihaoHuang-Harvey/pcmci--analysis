@@ -1051,10 +1051,7 @@ def draw_mci_bar_chart(
                     fontproperties=font_prop)
 
     ax.set_xticks(x)
-    italic_font = font_prop.copy()
-    italic_font.set_size(7.5)
-    italic_font.set_style("italic")
-    ax.set_xticklabels(display_names, fontproperties=italic_font)
+    ax.set_xticklabels(display_names, rotation=45, ha='right', fontsize=7.5, fontproperties=font_prop)
     ax.set_ylabel("MCI", fontsize=10, fontproperties=font_prop)
     ax.set_title(f"各变量对「{target_name}」的 MCI 值", fontsize=11, fontweight="bold",
                  fontproperties=font_prop, pad=10)
