@@ -52,6 +52,8 @@ from app.core.models import (
     AnalysisConfig,
     AnalysisResult,
     AppConfig,
+    ConstraintType,
+    ManualConstraintRule,
     ROLE_DESCRIPTIONS,
     ROLE_LABELS,
     TEConfig,
@@ -100,6 +102,7 @@ class MainWindow(QMainWindow):
 
         self.excluded_columns: set[str] = set()
         self.current_role_mapping: dict[str, VariableRole] = {}
+        self.manual_constraints: list[ManualConstraintRule] = []
 
         self._build_ui()
         self._apply_theme()
@@ -332,8 +335,11 @@ class MainWindow(QMainWindow):
         header_layout = QHBoxLayout()
         self.auto_detect_roles_button = QPushButton("自动识别角色")
         self.reset_regular_roles_button = QPushButton("全部设为普通变量")
+        self.advanced_constraint_button = QPushButton("高级约束")
+        self.advanced_constraint_button.setToolTip("设置高级边约束规则，精细控制变量间的因果方向")
         header_layout.addWidget(self.auto_detect_roles_button)
         header_layout.addWidget(self.reset_regular_roles_button)
+        header_layout.addWidget(self.advanced_constraint_button)
         header_layout.addStretch(1)
         layout.addLayout(header_layout)
 
@@ -770,6 +776,7 @@ class MainWindow(QMainWindow):
 
         self.auto_detect_roles_button.clicked.connect(lambda: self.auto_detect_roles(reset=True))
         self.reset_regular_roles_button.clicked.connect(self.reset_all_roles_to_regular)
+        self.advanced_constraint_button.clicked.connect(self._show_advanced_constraint_dialog)
         self.step2_prev_button.clicked.connect(lambda: self.step_tabs.setCurrentIndex(0))
         self.step2_next_button.clicked.connect(lambda: self.step_tabs.setCurrentIndex(2))
 
@@ -1099,6 +1106,7 @@ class MainWindow(QMainWindow):
             result_file_name=defaults.result_file_name,
             log_level=defaults.log_level,
             default_data_path=defaults.default_data_path,
+            manual_rules=list(self.manual_constraints),
         )
 
     def _refresh_run_summary(self) -> None:
@@ -1127,6 +1135,7 @@ class MainWindow(QMainWindow):
                 f"  tau_max = {self.tau_max_spin.value()}",
                 f"  pc_alpha = {self.alpha_spin.value():.4f}",
                 f"  归一化分位数 = ({self.quantile_low_spin.value()}, {self.quantile_high_spin.value()})",
+                f"  高级边约束数 = {len(self.manual_constraints)}",
                 "TE 参数：",
                 f"  分箱数 = {self.te_bins_spin.value()}",
                 f"  历史长度 k = {self.te_k_spin.value()}",
@@ -1163,7 +1172,7 @@ class MainWindow(QMainWindow):
             tau_min=config.tau_min,
             tau_max=config.tau_max,
             role_mapping=role_mapping,
-            manual_rules=[],
+            manual_rules=config.manual_rules,
             logger=self.append_log,
         )
 
@@ -1686,6 +1695,130 @@ class MainWindow(QMainWindow):
             # TE 结果标签页
             self.export_result_button.setText("导出 TE 结果")
             self.export_result_button.setEnabled(self.current_te_result is not None)
+
+    def _show_advanced_constraint_dialog(self) -> None:
+        """显示高级边约束设置对话框。"""
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("高级边约束设置")
+        dialog.resize(700, 500)
+
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(8)
+
+        hint_label = QLabel(
+            "高级约束允许您精细控制 PCMCI+ 分析中变量间的因果方向。\n"
+            "这些约束将在角色约束之后应用，优先级更高。\n"
+            "• 禁止入边 (NO_IN): 其他变量不能影响目标变量\n"
+            "• 禁止出边 (NO_OUT): 该变量不能影响其他变量\n"
+            "• 禁止连接 (NO_LINK): 两个变量之间无任何因果关系"
+        )
+        hint_label.setWordWrap(True)
+        hint_label.setStyleSheet("color: #666; padding: 6px; background: #f5f5f5; border-radius: 4px;")
+        layout.addWidget(hint_label)
+
+        var_names = list(self.current_role_mapping.keys()) if self.current_role_mapping else []
+
+        form_layout = QHBoxLayout()
+        form_layout.addWidget(QLabel("源变量:"))
+        source_combo = QComboBox()
+        source_combo.addItems(var_names)
+        source_combo.setMinimumWidth(150)
+        form_layout.addWidget(source_combo)
+
+        form_layout.addWidget(QLabel("目标变量:"))
+        target_combo = QComboBox()
+        target_combo.addItems(var_names)
+        target_combo.setMinimumWidth(150)
+        form_layout.addWidget(target_combo)
+
+        form_layout.addWidget(QLabel("约束类型:"))
+        type_combo = QComboBox()
+        type_combo.addItems(["禁止入边 (NO_IN)", "禁止出边 (NO_OUT)", "禁止连接 (NO_LINK)"])
+        type_combo.setMinimumWidth(140)
+        form_layout.addWidget(type_combo)
+
+        add_btn = QPushButton("添加")
+        add_btn.setMaximumWidth(60)
+        add_btn.setPrimary(True)
+        form_layout.addWidget(add_btn)
+        form_layout.addStretch(1)
+        layout.addLayout(form_layout)
+
+        constraint_table = QTableWidget()
+        constraint_table.setColumnCount(5)
+        constraint_table.setHorizontalHeaderLabels(["序号", "源变量", "目标变量", "约束类型", "操作"])
+        constraint_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        constraint_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        constraint_table.horizontalHeader().setSectionStretchLastSection(True)
+        constraint_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        constraint_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        layout.addWidget(constraint_table, stretch=1)
+
+        type_map = {
+            "禁止入边 (NO_IN)": ConstraintType.NO_IN,
+            "禁止出边 (NO_OUT)": ConstraintType.NO_OUT,
+            "禁止连接 (NO_LINK)": ConstraintType.NO_LINK,
+        }
+        type_display = {
+            ConstraintType.NO_IN: "禁止入边",
+            ConstraintType.NO_OUT: "禁止出边",
+            ConstraintType.NO_LINK: "禁止连接",
+        }
+
+        def refresh_table():
+            constraint_table.setRowCount(len(self.manual_constraints))
+            for row, rule in enumerate(self.manual_constraints):
+                constraint_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
+                constraint_table.setItem(row, 1, QTableWidgetItem(rule.source_name))
+                constraint_table.setItem(row, 2, QTableWidgetItem(rule.target_name))
+                constraint_table.setItem(row, 3, QTableWidgetItem(type_display.get(rule.constraint_type, str(rule.constraint_type))))
+                del_btn = QPushButton("删除")
+                del_btn.setMaximumWidth(50)
+                idx = row
+                del_btn.clicked.connect(lambda _, i=idx: _delete_rule(i))
+                constraint_table.setCellWidget(row, 4, del_btn)
+
+        def _add_rule():
+            src = source_combo.currentText()
+            tgt = target_combo.currentText()
+            if not src or not tgt:
+                QMessageBox.warning(dialog, "提示", "请选择源变量和目标变量。")
+                return
+            if src == tgt:
+                QMessageBox.warning(dialog, "提示", "源变量和目标变量不能相同。")
+                return
+            ctype = type_map.get(type_combo.currentText())
+            for existing in self.manual_constraints:
+                if existing.source_name == src and existing.target_name == tgt and existing.constraint_type == ctype:
+                    QMessageBox.warning(dialog, "提示", "该约束规则已存在。")
+                    return
+            self.manual_constraints.append(
+                ManualConstraintRule(source_name=src, target_name=tgt, constraint_type=ctype)
+            )
+            refresh_table()
+
+        def _delete_rule(idx):
+            if 0 <= idx < len(self.manual_constraints):
+                del self.manual_constraints[idx]
+                refresh_table()
+
+        add_btn.clicked.connect(_add_rule)
+        refresh_table()
+
+        btn_layout = QHBoxLayout()
+        clear_btn = QPushButton("清空全部")
+        clear_btn.setToolTip("删除所有手动约束规则")
+        close_btn = QPushButton("关闭")
+        btn_layout.addWidget(clear_btn)
+        btn_layout.addStretch(1)
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
+
+        clear_btn.clicked.connect(lambda: [self.manual_constraints.clear(), refresh_table()])
+        close_btn.clicked.connect(dialog.accept)
+
+        dialog.exec_()
 
     def _show_export_dialog(self) -> None:
         """显示导出结果对话框，让用户选择要导出的内容。"""

@@ -92,6 +92,7 @@ class AnalysisConfig:
     result_file_name: str = "pcmci_results.pkl"
     log_level: str = "INFO"
     default_data_path: str = ""
+    manual_rules: list[ManualConstraintRule] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -103,6 +104,7 @@ class AnalysisConfig:
             "result_file_name": self.result_file_name,
             "log_level": self.log_level,
             "default_data_path": self.default_data_path,
+            "manual_rules": [r.to_dict() for r in self.manual_rules],
         }
 
 
