@@ -1740,7 +1740,6 @@ class MainWindow(QMainWindow):
 
         add_btn = QPushButton("添加")
         add_btn.setMaximumWidth(60)
-        add_btn.setPrimary(True)
         form_layout.addWidget(add_btn)
         form_layout.addStretch(1)
         layout.addLayout(form_layout)
