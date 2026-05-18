@@ -1047,3 +1047,91 @@ def draw_mci_bar_chart(
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     style_result_axes(ax)
+
+
+def draw_te_target_bar_chart(
+    ax,
+    te_matrix: np.ndarray,
+    ndte_matrix: np.ndarray,
+    var_names: list[str],
+    target_name: str,
+    tau_max: int,
+) -> None:
+    """绘制其他变量对目标变量的 TE 值柱状图（按每个滞后期独立显示）。"""
+
+    if target_name not in var_names:
+        raise ValueError(f"目标变量 {target_name} 不在分析结果中。")
+
+    target_idx = var_names.index(target_name)
+    source_indices = list(range(len(var_names)))
+
+    display_names: list[str] = []
+    te_values: list[float] = []
+    bar_labels: list[str] = []
+    bar_colors: list[str] = []
+
+    for src_idx in source_indices:
+        if src_idx == target_idx:
+            continue
+        name = var_names[src_idx]
+        best_te_val = 0.0
+        best_ndte_val = 0.0
+        best_te_label = ""
+        best_ndte_label = ""
+        best_te_tau = -1
+        best_ndte_tau = -1
+
+        for tau in range(1, tau_max + 1):
+            te_val = float(te_matrix[src_idx, target_idx, tau])
+            ndte_val = float(ndte_matrix[src_idx, target_idx, tau])
+
+            if te_val > best_te_val:
+                best_te_val = te_val
+                best_te_label = f"{te_val:.3f}"
+                best_te_tau = tau
+
+            if ndte_val > best_ndte_val:
+                best_ndte_val = ndte_val
+                best_ndte_label = f"{ndte_val:.3f}"
+                best_ndte_tau = tau
+
+        if best_te_tau >= 0:
+            display_names.append(f"{name} (TE, t{best_te_tau})")
+            te_values.append(best_te_val)
+            bar_labels.append(best_te_label)
+            bar_colors.append('#d62728')
+
+        if best_ndte_tau >= 0:
+            display_names.append(f"{name} (NDTE, t{best_ndte_tau})")
+            te_values.append(best_ndte_val)
+            bar_labels.append(best_ndte_label)
+            bar_colors.append('#1f77b4')
+
+    x = np.arange(len(display_names))
+    width = 0.7
+
+    font_prop = get_chinese_font_properties()
+    bars = ax.bar(x, te_values, width, color=bar_colors, alpha=0.85, edgecolor="white", linewidth=0.6)
+
+    for bar, label_text in zip(bars, bar_labels):
+        if label_text and float(label_text) > 0.01:
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                    label_text, ha="center", va="bottom", fontsize=7.5,
+                    fontproperties=font_prop)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(display_names, rotation=45, ha='right', fontsize=7.5, fontproperties=font_prop)
+
+    ax.set_ylabel("信息强度", fontsize=10, fontproperties=font_prop)
+    ax.set_title(f"各变量对「{target_name}」的 TE/NDTE 值", fontsize=11, fontweight="bold",
+                 fontproperties=font_prop, pad=10)
+
+    legend_elements = [
+        Patch(facecolor='#d62728', alpha=0.85, edgecolor="white", linewidth=0.6, label="TE"),
+        Patch(facecolor='#1f77b4', alpha=0.85, edgecolor="white", linewidth=0.6, label="NDTE")
+    ]
+    ax.legend(handles=legend_elements, loc="upper right", fontsize=9, framealpha=0.9)
+    ax.set_ylim(bottom=0)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    style_result_axes(ax)

@@ -69,6 +69,7 @@ from app.gui.result_plotting import (
     build_target_centric_time_series_data,
     build_upstream_graph_data,
     draw_mci_bar_chart,
+    draw_te_target_bar_chart,
     draw_upstream_graph,
     draw_target_centric_time_series,
     get_chinese_font_properties,
@@ -771,6 +772,17 @@ class MainWindow(QMainWindow):
         te_bar_scroll.setWidget(te_bar_page)
         self.te_result_tabs.addTab(te_bar_scroll, "TE 柱状图")
 
+        # TE 柱状图（目标变量）页面
+        te_target_bar_scroll = QScrollArea()
+        te_target_bar_scroll.setWidgetResizable(True)
+        te_target_bar_page = QWidget()
+        te_target_bar_layout = QVBoxLayout(te_target_bar_page)
+        self.te_target_bar_canvas = CanvasWidget(te_target_bar_page, width=14, height=9, title="TE 柱状图（目标变量）")
+        self.te_target_bar_canvas.double_clicked.connect(self._show_figure_popup)
+        te_target_bar_layout.addWidget(self.te_target_bar_canvas)
+        te_target_bar_scroll.setWidget(te_target_bar_page)
+        self.te_result_tabs.addTab(te_target_bar_scroll, "TE 柱状图（目标变量）")
+
         return panel
 
     def _bind_signals(self) -> None:
@@ -873,6 +885,7 @@ class MainWindow(QMainWindow):
         self.plot_time_series_graph()
         self.plot_target_influence_graph()
         self.plot_mci_bar_chart()
+        self.plot_te_target_bar_chart()
 
     def _create_help_label(self, text: str) -> QLabel:
         label = QLabel(text or "")
@@ -1472,6 +1485,7 @@ class MainWindow(QMainWindow):
             self.te_table.setItem(row, 4, QTableWidgetItem(f"{ndte_val:.4f}"))
 
         self._plot_te_bar_graph(max_te_matrix, max_ndte_matrix, var_names)
+        self.plot_te_target_bar_chart()
 
     def _plot_te_result_graph(self, max_te_matrix: np.ndarray, max_ndte_matrix: np.ndarray, var_names: list[str]) -> None:
         fig = self.te_graph_canvas.fig
@@ -2417,6 +2431,26 @@ class MainWindow(QMainWindow):
         )
         apply_colorbar_theme(self.mci_bar_canvas.fig)
         self.mci_bar_canvas.draw()
+
+    def plot_te_target_bar_chart(self) -> None:
+        if self.current_te_result is None:
+            return
+
+        target_name = str(self.target_variable_combo.currentData() or "")
+        if not target_name:
+            target_name = self._get_default_target_name(self.current_te_result.var_names)
+
+        self.te_target_bar_canvas.clear_figure()
+        draw_te_target_bar_chart(
+            ax=self.te_target_bar_canvas.axes,
+            te_matrix=self.current_te_result.te_matrix,
+            ndte_matrix=self.current_te_result.ndte_matrix,
+            var_names=self.current_te_result.var_names,
+            target_name=target_name,
+            tau_max=self.current_te_result.config.tau_max,
+        )
+        apply_colorbar_theme(self.te_target_bar_canvas.fig)
+        self.te_target_bar_canvas.draw()
 
 
 # 兼容旧导入路径，避免过渡期间外部模块报错。
