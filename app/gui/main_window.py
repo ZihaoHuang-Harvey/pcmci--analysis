@@ -508,6 +508,12 @@ class MainWindow(QMainWindow):
         te_result_layout.addWidget(self._build_te_result_panel())
         self.algo_result_tabs.addTab(te_result_page, "TE 结果")
 
+        # 新增联合结果标签页
+        combined_result_page = QWidget()
+        combined_result_layout = QVBoxLayout(combined_result_page)
+        combined_result_layout.addWidget(self._build_combined_result_panel())
+        self.algo_result_tabs.addTab(combined_result_page, "联合结果")
+
         action_layout = QHBoxLayout()
         self.step4_prev_button = QPushButton("返回参数设置")
         self.export_result_button = QPushButton("导出 PCMCI+ 结果")
@@ -798,6 +804,62 @@ class MainWindow(QMainWindow):
 
         return panel
 
+    def _build_combined_result_panel(self) -> QWidget:
+        """构建联合结果面板，同时显示 PCMCI+ MCI 柱状图和 TE 目标变量柱状图。"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+
+        # 提示标签
+        hint = QLabel("联合对比：显示两个算法对同一目标变量的分析结果。"
+                     "注意：两个算法的变量会自动对齐，缺少某算法结果的变量对应柱子会显示为空。")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #666; padding: 6px; background: #f5f5f5; border-radius: 4px;")
+        layout.addWidget(hint)
+
+        # 联合设置控件
+        control_group = QGroupBox("联合设置")
+        control_layout = QHBoxLayout(control_group)
+        control_layout.setContentsMargins(8, 20, 8, 8)
+
+        control_layout.addWidget(QLabel("目标变量:"))
+        self.combined_target_combo = QComboBox()
+        self.combined_target_combo.setEnabled(False)
+        self.combined_target_combo.setMinimumWidth(120)
+        control_layout.addWidget(self.combined_target_combo)
+
+        # 添加对齐选项
+        control_layout.addSpacing(20)
+        control_layout.addWidget(QLabel("对齐方式:"))
+        self.combined_alignment_combo = QComboBox()
+        self.combined_alignment_combo.addItem("显示两个算法的交集变量", "intersection")
+        self.combined_alignment_combo.addItem("显示两个算法的并集变量", "union")
+        self.combined_alignment_combo.addItem("只显示 PCMCI+ 有结果的变量", "pcmci_only")
+        self.combined_alignment_combo.addItem("只显示 TE 有结果的变量", "te_only")
+        self.combined_alignment_combo.setMinimumWidth(180)
+        control_layout.addWidget(self.combined_alignment_combo)
+
+        control_layout.addStretch(1)
+        layout.addWidget(control_group)
+
+        # 上下两栏分别显示两个柱状图
+        self.combined_result_tabs = QTabWidget()
+        self.combined_result_tabs.setMinimumHeight(500)
+        layout.addWidget(self.combined_result_tabs, stretch=1)
+
+        # MCI 柱状图（联合）
+        self.combined_mci_bar_canvas = CanvasWidget(None, width=14, height=7, title="PCMCI+ MCI 柱状图")
+        self.combined_mci_bar_canvas.double_clicked.connect(self._show_figure_popup)
+        mci_bar_view = self._create_scalable_view(self.combined_mci_bar_canvas, base_width=900, base_height=520, tab_label="PCMCI+ 柱状图")
+        self.combined_result_tabs.addTab(mci_bar_view, "PCMCI+ 柱状图")
+
+        # TE 柱状图（目标变量，联合）
+        self.combined_te_bar_canvas = CanvasWidget(None, width=14, height=7, title="TE 柱状图（目标变量）")
+        self.combined_te_bar_canvas.double_clicked.connect(self._show_figure_popup)
+        te_bar_view = self._create_scalable_view(self.combined_te_bar_canvas, base_width=900, base_height=520, tab_label="TE 柱状图")
+        self.combined_result_tabs.addTab(te_bar_view, "TE 柱状图")
+
+        return panel
+
     def _bind_signals(self) -> None:
         self.browse_button.clicked.connect(self.select_file)
         self.load_button.clicked.connect(self.load_data)
@@ -831,6 +893,8 @@ class MainWindow(QMainWindow):
         self.algo_result_tabs.currentChanged.connect(self._update_export_button_text)
         self.target_variable_combo.currentIndexChanged.connect(self.refresh_target_dependent_graphs)
         self.te_target_variable_combo.currentIndexChanged.connect(self.plot_te_target_bar_chart)
+        self.combined_target_combo.currentIndexChanged.connect(self.plot_combined_charts)
+        self.combined_alignment_combo.currentIndexChanged.connect(self.plot_combined_charts)
         self.only_target_edges_checkbox.toggled.connect(self.plot_time_series_graph)
 
         self.user_guide_action.triggered.connect(self._show_user_guide)
@@ -911,6 +975,18 @@ class MainWindow(QMainWindow):
             self.te_target_combo.setCurrentIndex(self.te_target_combo.findData(current_te_target))
         self.te_target_combo.setEnabled(bool(var_names))
         self.te_target_combo.blockSignals(False)
+
+        # 更新联合结果标签页的目标变量下拉框
+        self.combined_target_combo.blockSignals(True)
+        current_combined_target = self.combined_target_combo.currentData()
+        self.combined_target_combo.clear()
+        for name in var_names:
+            self.combined_target_combo.addItem(name, name)
+        combined_target = current_combined_target if current_combined_target in var_names else self._get_default_target_name(var_names)
+        if combined_target:
+            self.combined_target_combo.setCurrentIndex(self.combined_target_combo.findData(combined_target))
+        self.combined_target_combo.setEnabled(bool(var_names))
+        self.combined_target_combo.blockSignals(False)
 
     def refresh_target_dependent_graphs(self) -> None:
         """刷新所有依赖目标变量选择的结果图。"""
@@ -1274,6 +1350,7 @@ class MainWindow(QMainWindow):
         self._refresh_target_variable_options()
         self.plot_causal_graph()
         self.refresh_target_dependent_graphs()
+        self.plot_combined_charts()
 
         self.append_log("PCMCI+ 分析完成。")
         self.append_log(f"PCMCI+ 结果已保存到：{self.current_result_path}")
@@ -1397,6 +1474,7 @@ class MainWindow(QMainWindow):
         self._refresh_target_variable_options()
         self.plot_causal_graph()
         self.refresh_target_dependent_graphs()
+        self.plot_combined_charts()
 
         self.append_log("PCMCI+ 分析完成。")
         self.append_log(f"PCMCI+ 结果已保存到：{self.current_result_path}")
@@ -1520,6 +1598,7 @@ class MainWindow(QMainWindow):
         self._plot_te_bar_graph(max_te_matrix, max_ndte_matrix, var_names)
         self._refresh_target_variable_options()
         self.plot_te_target_bar_chart()
+        self.plot_combined_charts()
 
     def _plot_te_result_graph(self, max_te_matrix: np.ndarray, max_ndte_matrix: np.ndarray, var_names: list[str]) -> None:
         fig = self.te_graph_canvas.fig
@@ -2485,6 +2564,101 @@ class MainWindow(QMainWindow):
         )
         apply_colorbar_theme(self.te_target_bar_canvas.fig)
         self.te_target_bar_canvas.draw()
+
+    def plot_combined_charts(self) -> None:
+        """绘制联合对比图表（对齐变量）。"""
+        if self.current_result is None and self.current_te_result is None:
+            return
+
+        # 获取目标变量
+        target_name = str(self.combined_target_combo.currentData() or "")
+        if not target_name:
+            # 尝试从可用的结果中获取默认目标
+            if self.current_result is not None:
+                target_name = self._get_default_target_name(self.current_result.var_names)
+            elif self.current_te_result is not None:
+                target_name = self._get_default_target_name(self.current_te_result.var_names)
+            else:
+                return
+
+        # 获取对齐模式
+        alignment_mode = str(self.combined_alignment_combo.currentData() or "union")
+
+        # 提取 MCI 信息
+        mci_info = {'display_names': [], 'values': [], 'labels': [], 'colors': []}
+        mci_var_names = []
+        mci_tau_min = 0
+        mci_tau_max = 0
+        mci_pc_alpha = 0.05
+        if self.current_result is not None:
+            from app.gui.result_plotting import extract_mci_info
+            mci_var_names = self.current_result.var_names
+            mci_tau_min = self.current_result.tau_min
+            mci_tau_max = self.current_result.tau_max
+            mci_pc_alpha = self.current_result.pc_alpha
+            mci_info = extract_mci_info(
+                val_matrix=self.current_result.val_matrix,
+                p_matrix=self.current_result.p_matrix,
+                var_names=mci_var_names,
+                target_name=target_name,
+                tau_min=mci_tau_min,
+                tau_max=mci_tau_max,
+                pc_alpha=mci_pc_alpha,
+            )
+
+        # 提取 TE 信息
+        te_info = {'display_names': [], 'values': [], 'labels': [], 'colors': []}
+        te_var_names = []
+        te_tau_max = 0
+        if self.current_te_result is not None:
+            from app.gui.result_plotting import extract_te_info
+            te_var_names = self.current_te_result.var_names
+            te_tau_max = self.current_te_result.config.tau_max
+            te_info = extract_te_info(
+                te_matrix=self.current_te_result.te_matrix,
+                ndte_matrix=self.current_te_result.ndte_matrix,
+                var_names=te_var_names,
+                target_name=target_name,
+                tau_max=te_tau_max,
+            )
+
+        # 获取对齐的变量标签
+        from app.gui.result_plotting import get_aligned_variables
+        aligned_names = get_aligned_variables(mci_info, te_info, alignment_mode)
+
+        # 绘制 MCI 图表
+        self.combined_mci_bar_canvas.clear_figure()
+        if self.current_result is not None:
+            from app.gui.result_plotting import draw_aligned_mci_bar_chart
+            draw_aligned_mci_bar_chart(
+                ax=self.combined_mci_bar_canvas.axes,
+                val_matrix=self.current_result.val_matrix,
+                p_matrix=self.current_result.p_matrix,
+                var_names=mci_var_names,
+                target_name=target_name,
+                tau_min=mci_tau_min,
+                tau_max=mci_tau_max,
+                pc_alpha=mci_pc_alpha,
+                aligned_names=aligned_names,
+            )
+        apply_colorbar_theme(self.combined_mci_bar_canvas.fig)
+        self.combined_mci_bar_canvas.draw()
+
+        # 绘制 TE 图表
+        self.combined_te_bar_canvas.clear_figure()
+        if self.current_te_result is not None:
+            from app.gui.result_plotting import draw_aligned_te_bar_chart
+            draw_aligned_te_bar_chart(
+                ax=self.combined_te_bar_canvas.axes,
+                te_matrix=self.current_te_result.te_matrix,
+                ndte_matrix=self.current_te_result.ndte_matrix,
+                var_names=te_var_names,
+                target_name=target_name,
+                tau_max=te_tau_max,
+                aligned_names=aligned_names,
+            )
+        apply_colorbar_theme(self.combined_te_bar_canvas.fig)
+        self.combined_te_bar_canvas.draw()
 
 
 # 兼容旧导入路径，避免过渡期间外部模块报错。
