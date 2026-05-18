@@ -68,6 +68,7 @@ from app.gui.result_plotting import (
     apply_colorbar_theme,
     build_target_centric_time_series_data,
     build_upstream_graph_data,
+    draw_mci_bar_chart,
     draw_upstream_graph,
     draw_target_centric_time_series,
     get_chinese_font_properties,
@@ -687,6 +688,12 @@ class MainWindow(QMainWindow):
         mci_view = self._create_scalable_view(self.mci_table, base_width=1000, base_height=450, tab_label="MCI 矩阵")
         self.pcmci_result_tabs.addTab(mci_view, "MCI 矩阵")
 
+        # MCI 柱状图页面（带缩放）
+        self.mci_bar_canvas = CanvasWidget(None, width=9, height=5.5, title="MCI 柱状图")
+        self.mci_bar_canvas.double_clicked.connect(self._show_figure_popup)
+        bar_view = self._create_scalable_view(self.mci_bar_canvas, base_width=600, base_height=420, tab_label="MCI 柱状图")
+        self.pcmci_result_tabs.addTab(bar_view, "MCI 柱状图")
+
         return panel
 
     def _build_te_result_panel(self) -> QWidget:
@@ -865,6 +872,7 @@ class MainWindow(QMainWindow):
 
         self.plot_time_series_graph()
         self.plot_target_influence_graph()
+        self.plot_mci_bar_chart()
 
     def _create_help_label(self, text: str) -> QLabel:
         label = QLabel(text or "")
@@ -2387,6 +2395,28 @@ class MainWindow(QMainWindow):
         )
         apply_colorbar_theme(self.target_graph_canvas.fig)
         self.target_graph_canvas.draw()
+
+    def plot_mci_bar_chart(self) -> None:
+        if self.current_result is None:
+            return
+
+        target_name = str(self.target_variable_combo.currentData() or "")
+        if not target_name:
+            target_name = self._get_default_target_name(self.current_result.var_names)
+
+        self.mci_bar_canvas.clear_figure()
+        draw_mci_bar_chart(
+            ax=self.mci_bar_canvas.axes,
+            val_matrix=self.current_result.val_matrix,
+            p_matrix=self.current_result.p_matrix,
+            var_names=self.current_result.var_names,
+            target_name=target_name,
+            tau_min=self.current_result.tau_min,
+            tau_max=self.current_result.tau_max,
+            pc_alpha=self.current_result.pc_alpha,
+        )
+        apply_colorbar_theme(self.mci_bar_canvas.fig)
+        self.mci_bar_canvas.draw()
 
 
 # 兼容旧导入路径，避免过渡期间外部模块报错。

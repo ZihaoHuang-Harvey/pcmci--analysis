@@ -942,3 +942,99 @@ def middle_color_hex(colormap: colors.Colormap) -> str:
 
     rgba = colormap(0.5)
     return colors.to_hex(rgba)
+
+
+def draw_mci_bar_chart(
+    ax,
+    val_matrix: np.ndarray,
+    p_matrix: np.ndarray,
+    var_names: list[str],
+    target_name: str,
+    tau_min: int,
+    tau_max: int,
+    pc_alpha: float,
+) -> None:
+    """绘制每个变量对目标变量的 MCI 柱状图。
+
+    对每个源变量，取所有滞后期中绝对值最大的 MCI 值作为代表，
+    用分组柱状图同时展示正向（橙色）和负向（蓝色）影响。
+    """
+
+    if target_name not in var_names:
+        raise ValueError(f"目标变量 {target_name} 不在分析结果中。")
+
+    target_idx = var_names.index(target_name)
+    source_indices = [i for i in range(len(var_names)) if i != target_idx]
+    source_names = [var_names[i] for i in source_indices]
+
+    positive_mcis: list[float] = []
+    negative_mcis: list[float] = []
+
+    positive_labels: list[str] = []
+    negative_labels: list[str] = []
+
+    for src_idx in source_indices:
+        best_pos_val = 0.0
+        best_neg_val = 0.0
+        best_pos_label = ""
+        best_neg_label = ""
+
+        for tau in range(max(1, tau_min), tau_max + 1):
+            val = float(val_matrix[src_idx, target_idx, tau])
+            p_val = float(p_matrix[src_idx, target_idx, tau])
+            if p_val > pc_alpha:
+                continue
+
+            if val > 0 and val > best_pos_val:
+                best_pos_val = val
+                best_pos_label = f"{val:.3f}"
+            elif val < 0 and abs(val) > abs(best_neg_val):
+                best_neg_val = val
+                best_neg_label = f"{val:.3f}"
+
+        tau0_val = float(val_matrix[src_idx, target_idx, 0])
+        tau0_p = float(p_matrix[src_idx, target_idx, 0])
+        if tau0_p <= pc_alpha:
+            if tau0_val > 0 and tau0_val > best_pos_val:
+                best_pos_val = tau0_val
+                best_pos_label = f"{tau0_val:.3f}"
+            elif tau0_val < 0 and abs(tau0_val) > abs(best_neg_val):
+                best_neg_val = tau0_val
+                best_neg_label = f"{tau0_val:.3f}"
+
+        positive_mcis.append(best_pos_val)
+        negative_mcis.append(abs(best_neg_val))
+        positive_labels.append(best_pos_label)
+        negative_labels.append(best_neg_label)
+
+    x = np.arange(len(source_names))
+    width = 0.35
+
+    font_prop = get_chinese_font_properties()
+    bars_pos = ax.bar(x - width / 2, positive_mcis, width, label="Positive MCI",
+                      color=THEME_COLORS["accent"], alpha=0.85, edgecolor="white", linewidth=0.6)
+    bars_neg = ax.bar(x + width / 2, negative_mcis, width, label="Negative MCI",
+                      color=THEME_COLORS["negative"], alpha=0.85, edgecolor="white", linewidth=0.6)
+
+    for bar, label_text in zip(bars_pos, positive_labels):
+        if label_text and float(label_text) > 0.01:
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                    label_text, ha="center", va="bottom", fontsize=7.5,
+                    fontproperties=font_prop)
+
+    for bar, label_text in zip(bars_neg, negative_labels):
+        if label_text and abs(float(label_text)) > 0.01:
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                    label_text, ha="center", va="bottom", fontsize=7.5,
+                    fontproperties=font_prop)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(source_names, rotation=30, ha="right", fontsize=8.5, fontproperties=font_prop)
+    ax.set_ylabel("MCI", fontsize=10, fontproperties=font_prop)
+    ax.set_title(f"各变量对「{target_name}」的 MCI 值", fontsize=11, fontweight="bold",
+                 fontproperties=font_prop, pad=10)
+    ax.legend(loc="upper right", fontsize=9, framealpha=0.9)
+    ax.set_ylim(bottom=0)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    style_result_axes(ax)
