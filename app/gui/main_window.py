@@ -689,9 +689,9 @@ class MainWindow(QMainWindow):
         self.pcmci_result_tabs.addTab(mci_view, "MCI 矩阵")
 
         # MCI 柱状图页面（带缩放）
-        self.mci_bar_canvas = CanvasWidget(None, width=9, height=5.5, title="MCI 柱状图")
+        self.mci_bar_canvas = CanvasWidget(None, width=12, height=5.5, title="MCI 柱状图")
         self.mci_bar_canvas.double_clicked.connect(self._show_figure_popup)
-        bar_view = self._create_scalable_view(self.mci_bar_canvas, base_width=600, base_height=420, tab_label="MCI 柱状图")
+        bar_view = self._create_scalable_view(self.mci_bar_canvas, base_width=800, base_height=420, tab_label="MCI 柱状图")
         self.pcmci_result_tabs.addTab(bar_view, "MCI 柱状图")
 
         return panel
