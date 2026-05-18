@@ -805,13 +805,13 @@ class MainWindow(QMainWindow):
         return panel
 
     def _build_combined_result_panel(self) -> QWidget:
-        """构建联合结果面板，同时显示 PCMCI+ MCI 柱状图和 TE 目标变量柱状图。"""
+        """构建联合结果面板，上下两层同时显示 PCMCI+ MCI 柱状图和 TE 目标变量柱状图。"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
 
         # 提示标签
-        hint = QLabel("联合对比：显示两个算法对同一目标变量的分析结果。"
-                     "注意：两个算法的变量会自动对齐，缺少某算法结果的变量对应柱子会显示为空。")
+        hint = QLabel("联合对比：上下两层显示两个算法对同一目标变量的分析结果，变量顺序完全对齐便于对比。"
+                     "缺少某算法结果的变量对应柱子会显示灰色。")
         hint.setWordWrap(True)
         hint.setStyleSheet("color: #666; padding: 6px; background: #f5f5f5; border-radius: 4px;")
         layout.addWidget(hint)
@@ -841,22 +841,41 @@ class MainWindow(QMainWindow):
         control_layout.addStretch(1)
         layout.addWidget(control_group)
 
-        # 上下两栏分别显示两个柱状图
-        self.combined_result_tabs = QTabWidget()
-        self.combined_result_tabs.setMinimumHeight(500)
-        layout.addWidget(self.combined_result_tabs, stretch=1)
+        # 上下两栏布局同时显示两个柱状图
+        combined_container = QSplitter(Qt.Vertical)
+        combined_container.setMinimumHeight(600)
+        combined_container.setHandleWidth(4)
 
-        # MCI 柱状图（联合）
-        self.combined_mci_bar_canvas = CanvasWidget(None, width=14, height=7, title="PCMCI+ MCI 柱状图")
+        # 上层：PCMCI+ MCI 柱状图
+        upper_widget = QWidget()
+        upper_layout = QVBoxLayout(upper_widget)
+        upper_layout.setContentsMargins(0, 0, 0, 0)
+
+        upper_title = QLabel("C. PCMCI+ MCI 柱状图")
+        upper_title.setStyleSheet("font-weight: bold; font-size: 11pt; padding: 4px;")
+        upper_layout.addWidget(upper_title)
+
+        self.combined_mci_bar_canvas = CanvasWidget(None, width=14, height=6, title="PCMCI+ MCI 柱状图")
         self.combined_mci_bar_canvas.double_clicked.connect(self._show_figure_popup)
-        mci_bar_view = self._create_scalable_view(self.combined_mci_bar_canvas, base_width=900, base_height=520, tab_label="PCMCI+ 柱状图")
-        self.combined_result_tabs.addTab(mci_bar_view, "PCMCI+ 柱状图")
+        upper_layout.addWidget(self.combined_mci_bar_canvas)
 
-        # TE 柱状图（目标变量，联合）
-        self.combined_te_bar_canvas = CanvasWidget(None, width=14, height=7, title="TE 柱状图（目标变量）")
+        # 下层：TE 柱状图（目标变量）
+        lower_widget = QWidget()
+        lower_layout = QVBoxLayout(lower_widget)
+        lower_layout.setContentsMargins(0, 0, 0, 0)
+
+        lower_title = QLabel("D. TE 柱状图（目标变量）")
+        lower_title.setStyleSheet("font-weight: bold; font-size: 11pt; padding: 4px;")
+        lower_layout.addWidget(lower_title)
+
+        self.combined_te_bar_canvas = CanvasWidget(None, width=14, height=6, title="TE 柱状图（目标变量）")
         self.combined_te_bar_canvas.double_clicked.connect(self._show_figure_popup)
-        te_bar_view = self._create_scalable_view(self.combined_te_bar_canvas, base_width=900, base_height=520, tab_label="TE 柱状图")
-        self.combined_result_tabs.addTab(te_bar_view, "TE 柱状图")
+        lower_layout.addWidget(self.combined_te_bar_canvas)
+
+        combined_container.addWidget(upper_widget)
+        combined_container.addWidget(lower_widget)
+        combined_container.setSizes([300, 300])
+        layout.addWidget(combined_container, stretch=1)
 
         return panel
 
