@@ -973,11 +973,16 @@ def draw_mci_bar_chart(
     positive_labels: list[str] = []
     negative_labels: list[str] = []
 
+    best_pos_taus: list[int] = []
+    best_neg_taus: list[int] = []
+
     for src_idx in source_indices:
         best_pos_val = 0.0
         best_neg_val = 0.0
         best_pos_label = ""
         best_neg_label = ""
+        best_pos_tau = -1
+        best_neg_tau = -1
 
         for tau in range(max(1, tau_min), tau_max + 1):
             val = float(val_matrix[src_idx, target_idx, tau])
@@ -988,9 +993,11 @@ def draw_mci_bar_chart(
             if val > 0 and val > best_pos_val:
                 best_pos_val = val
                 best_pos_label = f"{val:.3f}"
+                best_pos_tau = tau
             elif val < 0 and abs(val) > abs(best_neg_val):
                 best_neg_val = val
                 best_neg_label = f"{val:.3f}"
+                best_neg_tau = tau
 
         tau0_val = float(val_matrix[src_idx, target_idx, 0])
         tau0_p = float(p_matrix[src_idx, target_idx, 0])
@@ -998,17 +1005,32 @@ def draw_mci_bar_chart(
             if tau0_val > 0 and tau0_val > best_pos_val:
                 best_pos_val = tau0_val
                 best_pos_label = f"{tau0_val:.3f}"
+                best_pos_tau = 0
             elif tau0_val < 0 and abs(tau0_val) > abs(best_neg_val):
                 best_neg_val = tau0_val
                 best_neg_label = f"{tau0_val:.3f}"
+                best_neg_tau = 0
 
         positive_mcis.append(best_pos_val)
         negative_mcis.append(abs(best_neg_val))
         positive_labels.append(best_pos_label)
         negative_labels.append(best_neg_label)
+        best_pos_taus.append(best_pos_tau)
+        best_neg_taus.append(best_neg_tau)
 
     x = np.arange(len(source_names))
     width = 0.35
+
+    display_names: list[str] = []
+    for i, name in enumerate(source_names):
+        pos_tau = best_pos_taus[i]
+        neg_tau = best_neg_taus[i]
+        parts = [name]
+        if pos_tau >= 0:
+            parts.append(f"+t{pos_tau}" if pos_tau > 0 else "+t0")
+        if neg_tau >= 0:
+            parts.append(f"-t{neg_tau}" if neg_tau > 0 else "-t0")
+        display_names.append("\n".join(parts))
 
     font_prop = get_chinese_font_properties()
     bars_pos = ax.bar(x - width / 2, positive_mcis, width, label="Positive MCI",
@@ -1029,7 +1051,7 @@ def draw_mci_bar_chart(
                     fontproperties=font_prop)
 
     ax.set_xticks(x)
-    ax.set_xticklabels(source_names, rotation=30, ha="right", fontsize=8.5, fontproperties=font_prop)
+    ax.set_xticklabels(display_names, rotation=0, ha="center", fontsize=7.5, fontproperties=font_prop)
     ax.set_ylabel("MCI", fontsize=10, fontproperties=font_prop)
     ax.set_title(f"各变量对「{target_name}」的 MCI 值", fontsize=11, fontweight="bold",
                  fontproperties=font_prop, pad=10)
