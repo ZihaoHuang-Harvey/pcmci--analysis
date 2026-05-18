@@ -707,6 +707,19 @@ class MainWindow(QMainWindow):
         self.te_hint_label = te_hint
         layout.addWidget(te_hint)
 
+        # 添加 TE 结果的目标变量选择控件
+        te_control_group = QGroupBox("TE 结果设置")
+        te_control_layout = QHBoxLayout(te_control_group)
+        te_control_layout.setContentsMargins(8, 20, 8, 8)
+
+        te_control_layout.addWidget(QLabel("目标变量:"))
+        self.te_target_variable_combo = QComboBox()
+        self.te_target_variable_combo.setEnabled(False)
+        self.te_target_variable_combo.setMinimumWidth(120)
+        te_control_layout.addWidget(self.te_target_variable_combo)
+        te_control_layout.addStretch(1)
+        layout.addWidget(te_control_group)
+
         self.te_result_tabs = QTabWidget()
         self.te_result_tabs.setMinimumHeight(500)
         layout.addWidget(self.te_result_tabs, stretch=1)
@@ -817,6 +830,7 @@ class MainWindow(QMainWindow):
         self.export_result_button.clicked.connect(self._show_export_dialog)
         self.algo_result_tabs.currentChanged.connect(self._update_export_button_text)
         self.target_variable_combo.currentIndexChanged.connect(self.refresh_target_dependent_graphs)
+        self.te_target_variable_combo.currentIndexChanged.connect(self.plot_te_target_bar_chart)
         self.only_target_edges_checkbox.toggled.connect(self.plot_time_series_graph)
 
         self.user_guide_action.triggered.connect(self._show_user_guide)
@@ -852,9 +866,13 @@ class MainWindow(QMainWindow):
         return var_names[0] if var_names else ""
 
     def _refresh_target_variable_options(self) -> None:
-        """刷新“目标变量上游影响图”的目标变量下拉框。"""
+        """刷新“目标变量上游影响图”和“TE 柱状图（目标变量）”的目标变量下拉框。"""
 
-        var_names = self.current_result.var_names if self.current_result is not None else []
+        # 获取变量名（优先使用 PCMCI 结果，其次使用 TE 结果）
+        var_names = self.current_result.var_names if self.current_result is not None else \
+                    (self.current_te_result.var_names if self.current_te_result is not None else [])
+
+        # 更新 PCMCI 目标变量下拉框
         current_name = self.target_variable_combo.currentData()
 
         self.target_variable_combo.blockSignals(True)
@@ -868,6 +886,21 @@ class MainWindow(QMainWindow):
         self.target_variable_combo.setEnabled(bool(var_names))
         self.target_variable_combo.blockSignals(False)
 
+        # 更新 TE 目标变量下拉框（用于 TE 柱状图（目标变量））
+        current_te_target_var = self.te_target_variable_combo.currentData()
+
+        self.te_target_variable_combo.blockSignals(True)
+        self.te_target_variable_combo.clear()
+        for name in var_names:
+            self.te_target_variable_combo.addItem(name, name)
+
+        te_target_var = current_te_target_var if current_te_target_var in var_names else self._get_default_target_name(var_names)
+        if te_target_var:
+            self.te_target_variable_combo.setCurrentIndex(self.te_target_variable_combo.findData(te_target_var))
+        self.te_target_variable_combo.setEnabled(bool(var_names))
+        self.te_target_variable_combo.blockSignals(False)
+
+        # 更新 TE 分析时的目标变量下拉框
         self.te_target_combo.blockSignals(True)
         current_te_target = self.te_target_combo.currentData()
         self.te_target_combo.clear()
@@ -1485,6 +1518,7 @@ class MainWindow(QMainWindow):
             self.te_table.setItem(row, 4, QTableWidgetItem(f"{ndte_val:.4f}"))
 
         self._plot_te_bar_graph(max_te_matrix, max_ndte_matrix, var_names)
+        self._refresh_target_variable_options()
         self.plot_te_target_bar_chart()
 
     def _plot_te_result_graph(self, max_te_matrix: np.ndarray, max_ndte_matrix: np.ndarray, var_names: list[str]) -> None:
@@ -2436,7 +2470,7 @@ class MainWindow(QMainWindow):
         if self.current_te_result is None:
             return
 
-        target_name = str(self.target_variable_combo.currentData() or "")
+        target_name = str(self.te_target_variable_combo.currentData() or "")
         if not target_name:
             target_name = self._get_default_target_name(self.current_te_result.var_names)
 
