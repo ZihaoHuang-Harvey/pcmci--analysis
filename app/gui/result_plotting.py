@@ -1025,12 +1025,15 @@ def draw_mci_bar_chart(
     for i, name in enumerate(source_names):
         pos_tau = best_pos_taus[i]
         neg_tau = best_neg_taus[i]
-        parts = [name]
+        tau_parts = []
         if pos_tau >= 0:
-            parts.append(f"+t{pos_tau}" if pos_tau > 0 else "+t0")
+            tau_parts.append(f"+t{pos_tau}" if pos_tau > 0 else "+t0")
         if neg_tau >= 0:
-            parts.append(f"-t{neg_tau}" if neg_tau > 0 else "-t0")
-        display_names.append("\n".join(parts))
+            tau_parts.append(f"-t{neg_tau}" if neg_tau > 0 else "-t0")
+        if tau_parts:
+            display_names.append(f"{name} ({', '.join(tau_parts)})")
+        else:
+            display_names.append(name)
 
     font_prop = get_chinese_font_properties()
     bars_pos = ax.bar(x - width / 2, positive_mcis, width, label="Positive MCI",
