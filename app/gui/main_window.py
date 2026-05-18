@@ -1749,7 +1749,7 @@ class MainWindow(QMainWindow):
         constraint_table.setHorizontalHeaderLabels(["序号", "源变量", "目标变量", "约束类型", "操作"])
         constraint_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         constraint_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        constraint_table.horizontalHeader().setSectionStretchLastSection(True)
+        constraint_table.horizontalHeader().setStretchLastSection(True)
         constraint_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         constraint_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         layout.addWidget(constraint_table, stretch=1)
