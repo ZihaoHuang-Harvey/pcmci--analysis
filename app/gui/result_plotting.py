@@ -1011,7 +1011,7 @@ def draw_mci_bar_chart(
     bars = ax.bar(x, mci_values, width, color=bar_colors, alpha=0.85, edgecolor="white", linewidth=0.6)
 
     for bar, label_text in zip(bars, bar_labels):
-        if label_text and abs(float(label_text)) > 0.01:
+        if label_text:
             ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
                     label_text, ha="center", va="bottom", fontsize=7.5,
                     fontproperties=font_prop)
@@ -1067,8 +1067,8 @@ def draw_te_target_bar_chart(
         display_names.append(name)
         te_values.append(te_val)
         ndte_values.append(ndte_val)
-        te_labels.append(f"{te_val:.3f}" if te_val > 0.01 else "")
-        ndte_labels.append(f"{ndte_val:.3f}" if ndte_val > 0.01 else "")
+        te_labels.append(f"{te_val:.3f}")
+        ndte_labels.append(f"{ndte_val:.3f}")
 
     x = np.arange(len(display_names))
     width = 0.35

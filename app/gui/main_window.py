@@ -2605,10 +2605,9 @@ class MainWindow(QMainWindow):
 
         # 标注数值和正负号
         for bar, raw_val, abs_val in zip(bars_mci, mci_vals, mci_abs):
-            if abs_val > 0.01:
-                sign = "+" if raw_val >= 0 else "-"
-                axes[0].text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
-                             f"{sign}{abs_val:.3f}", ha="center", va="bottom", fontsize=8, **font_kwargs)
+            sign = "+" if raw_val >= 0 else "-"
+            axes[0].text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                         f"{sign}{abs_val:.3f}", ha="center", va="bottom", fontsize=8, **font_kwargs)
 
         axes[0].set_ylabel("MCI 值 (绝对值)", fontsize=10, **font_kwargs)
         axes[0].set_title(f"PCMCI+ MCI 值（目标：{target_name}）", fontsize=11, fontweight="bold", **font_kwargs)
@@ -2617,7 +2616,7 @@ class MainWindow(QMainWindow):
         # 下子图：TE
         te_vals = [te_values.get(name, 0.0) for name in all_names]
         bars_te = axes[1].bar(x, te_vals, width, color='#d62728', alpha=0.85, edgecolor="white", linewidth=0.6, label="TE")
-        te_labels = [f"{v:.3f}" if v > 0.01 else "" for v in te_vals]
+        te_labels = [f"{v:.3f}" for v in te_vals]
         for bar, label_text in zip(bars_te, te_labels):
             if label_text:
                 axes[1].text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
