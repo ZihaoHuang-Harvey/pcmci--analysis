@@ -815,6 +815,20 @@ class MainWindow(QMainWindow):
         hint.setStyleSheet("color: #888; padding: 6px;")
         layout.addWidget(hint)
 
+        # 添加目标变量选择控件组
+        target_control_group = QGroupBox("目标变量")
+        target_control_layout = QHBoxLayout(target_control_group)
+        target_control_layout.setContentsMargins(10, 10, 10, 10)
+        
+        target_label = QLabel("选择目标变量：")
+        self.compare_target_variable_combo = QComboBox()
+        self.compare_target_variable_combo.setMinimumWidth(200)
+        
+        target_control_layout.addWidget(target_label)
+        target_control_layout.addWidget(self.compare_target_variable_combo)
+        target_control_layout.addStretch()
+        layout.addWidget(target_control_group)
+
         self.compare_canvas = CanvasWidget(None, width=14, height=7, title="TE/PCMCI+ 结果对比")
         self.compare_canvas.double_clicked.connect(self._show_figure_popup)
         compare_view = self._create_scalable_view(self.compare_canvas, base_width=900, base_height=500)
@@ -855,6 +869,7 @@ class MainWindow(QMainWindow):
         self.algo_result_tabs.currentChanged.connect(self._update_export_button_text)
         self.target_variable_combo.currentIndexChanged.connect(self.refresh_target_dependent_graphs)
         self.te_target_variable_combo.currentIndexChanged.connect(self.plot_te_target_bar_chart)
+        self.compare_target_variable_combo.currentIndexChanged.connect(self.plot_compare_chart)
         self.only_target_edges_checkbox.toggled.connect(self.plot_time_series_graph)
 
         self.user_guide_action.triggered.connect(self._show_user_guide)
@@ -936,6 +951,20 @@ class MainWindow(QMainWindow):
         self.te_target_combo.setEnabled(bool(var_names))
         self.te_target_combo.blockSignals(False)
 
+        # 更新对比图目标变量下拉框
+        current_compare_target_var = self.compare_target_variable_combo.currentData()
+
+        self.compare_target_variable_combo.blockSignals(True)
+        self.compare_target_variable_combo.clear()
+        for name in var_names:
+            self.compare_target_variable_combo.addItem(name, name)
+
+        compare_target_var = current_compare_target_var if current_compare_target_var in var_names else self._get_default_target_name(var_names)
+        if compare_target_var:
+            self.compare_target_variable_combo.setCurrentIndex(self.compare_target_variable_combo.findData(compare_target_var))
+        self.compare_target_variable_combo.setEnabled(bool(var_names))
+        self.compare_target_variable_combo.blockSignals(False)
+
     def refresh_target_dependent_graphs(self) -> None:
         """刷新所有依赖目标变量选择的结果图。"""
 
@@ -943,6 +972,7 @@ class MainWindow(QMainWindow):
         self.plot_target_influence_graph()
         self.plot_mci_bar_chart()
         self.plot_te_target_bar_chart()
+        self.plot_compare_chart()
 
     def _create_help_label(self, text: str) -> QLabel:
         label = QLabel(text or "")
@@ -2554,7 +2584,7 @@ class MainWindow(QMainWindow):
             return
 
         # 获取目标变量名
-        target_name = str(self.te_target_variable_combo.currentData() or "")
+        target_name = str(self.compare_target_variable_combo.currentData() or "")
         if not target_name:
             target_name = self._get_default_target_name(self.current_result.var_names)
 
