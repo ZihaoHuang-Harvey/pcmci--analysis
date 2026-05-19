@@ -18,7 +18,7 @@ class GuiSmokeTestCase(unittest.TestCase):
 
     def test_window_can_be_created(self) -> None:
         window = MainWindow()
-        self.assertEqual(window.windowTitle(), "多方法交互因果分析平台")
+        self.assertEqual(window.windowTitle(), "多方法时序因果发现比较分析平台")
         self.assertEqual(window.step_tabs.count(), 4)
         self.assertEqual(window.step_tabs.tabText(0), "1. 数据导入")
         self.assertEqual(window.step_tabs.tabText(1), "2. 变量角色")

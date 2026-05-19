@@ -1,6 +1,6 @@
 # Causal analysis system
 
-多方法交互因果分析平台 - 基于 PCMCI+ 和转移熵(Transfer Entropy)的因果关系发现与可视化工具
+多方法时序因果发现比较分析平台 - 基于 PCMCI+ 和转移熵(Transfer Entropy)的因果关系发现与可视化工具
 
 ## 项目简介
 

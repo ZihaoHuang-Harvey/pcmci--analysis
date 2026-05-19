@@ -115,7 +115,7 @@ class MainWindow(QMainWindow):
         self._mark_primary_actions()
 
     def _build_ui(self) -> None:
-        self.setWindowTitle("多方法交互因果分析平台")
+        self.setWindowTitle("多方法时序因果发现比较分析平台")
         self.setMinimumSize(1100, 700)
         self.resize(1280, 800)
 
@@ -202,7 +202,7 @@ class MainWindow(QMainWindow):
             return
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("多方法交互因果分析平台 使用说明")
+        dialog.setWindowTitle("多方法时序因果发现比较分析平台 使用说明")
         dialog.resize(800, 600)
 
         layout = QVBoxLayout(dialog)
