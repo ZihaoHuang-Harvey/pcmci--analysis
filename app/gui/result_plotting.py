@@ -956,8 +956,7 @@ def draw_mci_bar_chart(
 ) -> None:
     """绘制每个变量对目标变量的 MCI 柱状图。
 
-    对每个源变量，取所有滞后期中绝对值最大的 MCI 值作为代表，
-    用分组柱状图同时展示正向（橙色）和负向（蓝色）影响。
+    对每个源变量，取所有滞后期中绝对值最大的 MCI 值作为代表。
     """
 
     if target_name not in var_names:
@@ -973,12 +972,10 @@ def draw_mci_bar_chart(
 
     for src_idx in source_indices:
         name = var_names[src_idx]
-        best_pos_val = 0.0
-        best_neg_val = 0.0
-        best_pos_label = ""
-        best_neg_label = ""
-        best_pos_tau = -1
-        best_neg_tau = -1
+        best_val = 0.0
+        best_label = ""
+        best_tau = -1
+        best_color = ""
 
         for tau in range(max(1, tau_min), tau_max + 1):
             val = float(val_matrix[src_idx, target_idx, tau])
@@ -986,38 +983,26 @@ def draw_mci_bar_chart(
             if p_val > pc_alpha:
                 continue
 
-            if val > 0 and val > best_pos_val:
-                best_pos_val = val
-                best_pos_label = f"{val:.3f}"
-                best_pos_tau = tau
-            elif val < 0 and abs(val) > abs(best_neg_val):
-                best_neg_val = val
-                best_neg_label = f"{val:.3f}"
-                best_neg_tau = tau
+            if abs(val) > abs(best_val):
+                best_val = val
+                best_label = f"{val:.3f}"
+                best_tau = tau
+                best_color = THEME_COLORS["accent"] if val > 0 else THEME_COLORS["negative"]
 
         tau0_val = float(val_matrix[src_idx, target_idx, 0])
         tau0_p = float(p_matrix[src_idx, target_idx, 0])
         if src_idx != target_idx and tau0_p <= pc_alpha:
-            if tau0_val > 0 and tau0_val > best_pos_val:
-                best_pos_val = tau0_val
-                best_pos_label = f"{tau0_val:.3f}"
-                best_pos_tau = 0
-            elif tau0_val < 0 and abs(tau0_val) > abs(best_neg_val):
-                best_neg_val = tau0_val
-                best_neg_label = f"{tau0_val:.3f}"
-                best_neg_tau = 0
+            if abs(tau0_val) > abs(best_val):
+                best_val = tau0_val
+                best_label = f"{tau0_val:.3f}"
+                best_tau = 0
+                best_color = THEME_COLORS["accent"] if tau0_val > 0 else THEME_COLORS["negative"]
 
-        if best_pos_tau >= 0:
-            display_names.append(f"{name} (+t{best_pos_tau})" if best_pos_tau > 0 else f"{name} (+t0)")
-            mci_values.append(best_pos_val)
-            bar_labels.append(best_pos_label)
-            bar_colors.append(THEME_COLORS["accent"])
-
-        if best_neg_tau >= 0:
-            display_names.append(f"{name} (-t{best_neg_tau})" if best_neg_tau > 0 else f"{name} (-t0)")
-            mci_values.append(abs(best_neg_val))
-            bar_labels.append(best_neg_label)
-            bar_colors.append(THEME_COLORS["negative"])
+        if best_tau >= 0:
+            display_names.append(f"{name} (t{best_tau})" if best_tau > 0 else f"{name} (t0)")
+            mci_values.append(abs(best_val))
+            bar_labels.append(best_label)
+            bar_colors.append(best_color)
 
     x = np.arange(len(display_names))
     width = 0.7
@@ -1072,6 +1057,8 @@ def draw_te_target_bar_chart(
     ndte_labels: list[str] = []
 
     for src_idx in source_indices:
+        if src_idx == target_idx:
+            continue
         name = var_names[src_idx]
         # 只取最大期次的值
         te_val = float(te_matrix[src_idx, target_idx, tau_max])
