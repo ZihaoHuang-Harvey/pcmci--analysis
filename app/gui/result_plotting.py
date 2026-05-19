@@ -1056,27 +1056,17 @@ def extract_mci_info(
             continue
         name = var_names[src_idx]
         best_val = 0.0
-        best_tau = -1
 
         for tau in range(max(1, tau_min), tau_max + 1):
             val = float(val_matrix[src_idx, target_idx, tau])
-            p_val = float(p_matrix[src_idx, target_idx, tau])
-            if p_val > pc_alpha:
-                continue
-
             if abs(val) > abs(best_val):
                 best_val = val
-                best_tau = tau
 
         tau0_val = float(val_matrix[src_idx, target_idx, 0])
-        tau0_p = float(p_matrix[src_idx, target_idx, 0])
-        if src_idx != target_idx and tau0_p <= pc_alpha:
-            if abs(tau0_val) > abs(best_val):
-                best_val = tau0_val
-                best_tau = 0
+        if abs(tau0_val) > abs(best_val):
+            best_val = tau0_val
 
-        if best_tau >= 0:
-            mci_info[name] = abs(best_val)
+        mci_info[name] = abs(best_val)
 
     return mci_info
 
@@ -1127,18 +1117,9 @@ def draw_combined_bar_chart(
     mci_info = extract_mci_info(val_matrix, p_matrix, var_names, target_name, tau_min, tau_max, pc_alpha)
     te_info = extract_te_info(te_matrix, ndte_matrix, var_names, target_name, tau_max)
 
-    # 获取变量并集（排除目标变量）
-    all_vars = set(mci_info.keys()) | set(te_info.keys())
-    all_vars = [v for v in all_vars if v != target_name]
+    # 获取所有变量（排除目标变量），包括那些没有显著结果的
+    all_vars = [v for v in var_names if v != target_name]
     all_vars.sort()
-
-    if not all_vars:
-        font_prop = get_chinese_font_properties()
-        ax.text(0.5, 0.5, "没有可用的对比数据", ha='center', va='center', 
-                fontsize=12, fontproperties=font_prop)
-        ax.set_title(f"MCI vs TE 对比（目标：{target_name}）", fontsize=11, fontweight="bold", fontproperties=font_prop, pad=10)
-        ax.axis('off')
-        return
 
     mci_values = [mci_info.get(v, 0.0) for v in all_vars]
     te_values = [te_info.get(v, (0.0, 0.0))[0] for v in all_vars]
