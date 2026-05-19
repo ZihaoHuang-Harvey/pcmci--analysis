@@ -7,6 +7,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.patches import Patch
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
@@ -70,7 +71,6 @@ from app.gui.result_plotting import (
     build_upstream_graph_data,
     draw_mci_bar_chart,
     draw_te_target_bar_chart,
-    draw_combined_bar_chart,
     draw_upstream_graph,
     draw_target_centric_time_series,
     get_chinese_font_properties,
@@ -509,11 +509,10 @@ class MainWindow(QMainWindow):
         te_result_layout.addWidget(self._build_te_result_panel())
         self.algo_result_tabs.addTab(te_result_page, "TE 结果")
 
-        # TE/PCMCI+结果对比页面
-        combined_result_page = QWidget()
-        combined_result_layout = QVBoxLayout(combined_result_page)
-        combined_result_layout.addWidget(self._build_combined_result_panel())
-        self.algo_result_tabs.addTab(combined_result_page, "TE/PCMCI+结果对比")
+        compare_result_page = QWidget()
+        compare_result_layout = QVBoxLayout(compare_result_page)
+        compare_result_layout.addWidget(self._build_compare_result_panel())
+        self.algo_result_tabs.addTab(compare_result_page, "TE/PCMCI+ 结果对比")
 
         action_layout = QHBoxLayout()
         self.step4_prev_button = QPushButton("返回参数设置")
@@ -805,39 +804,21 @@ class MainWindow(QMainWindow):
 
         return panel
 
-    def _build_combined_result_panel(self) -> QWidget:
+    def _build_compare_result_panel(self) -> QWidget:
+        """构建 TE/PCMCI+ 结果对比面板。"""
+
         panel = QWidget()
         layout = QVBoxLayout(panel)
 
-        hint = QLabel("完成 PCMCI+ 和 TE 分析后，这里会显示对比结果。")
+        hint = QLabel("对比 PCMCI+ 的 MCI 值与 TE 值（目标变量视角），双击图表可放大查看。")
         hint.setWordWrap(True)
         hint.setStyleSheet("color: #888; padding: 6px;")
-        self.combined_hint_label = hint
         layout.addWidget(hint)
 
-        # 添加目标变量选择控件
-        control_group = QGroupBox("对比结果设置")
-        control_layout = QHBoxLayout(control_group)
-        control_layout.setContentsMargins(8, 20, 8, 8)
-
-        control_layout.addWidget(QLabel("目标变量:"))
-        self.combined_target_variable_combo = QComboBox()
-        self.combined_target_variable_combo.setEnabled(False)
-        self.combined_target_variable_combo.setMinimumWidth(120)
-        control_layout.addWidget(self.combined_target_variable_combo)
-        control_layout.addStretch(1)
-        layout.addWidget(control_group)
-
-        # 对比柱状图
-        combined_scroll = QScrollArea()
-        combined_scroll.setWidgetResizable(True)
-        combined_page = QWidget()
-        combined_layout = QVBoxLayout(combined_page)
-        self.combined_bar_canvas = CanvasWidget(combined_page, width=16, height=10, title="MCI vs TE/NDTE 对比")
-        self.combined_bar_canvas.double_clicked.connect(self._show_figure_popup)
-        combined_layout.addWidget(self.combined_bar_canvas)
-        combined_scroll.setWidget(combined_page)
-        layout.addWidget(combined_scroll, stretch=1)
+        self.compare_canvas = CanvasWidget(None, width=14, height=7, title="TE/PCMCI+ 结果对比")
+        self.compare_canvas.double_clicked.connect(self._show_figure_popup)
+        compare_view = self._create_scalable_view(self.compare_canvas, base_width=900, base_height=500)
+        layout.addWidget(compare_view, stretch=1)
 
         return panel
 
@@ -874,7 +855,6 @@ class MainWindow(QMainWindow):
         self.algo_result_tabs.currentChanged.connect(self._update_export_button_text)
         self.target_variable_combo.currentIndexChanged.connect(self.refresh_target_dependent_graphs)
         self.te_target_variable_combo.currentIndexChanged.connect(self.plot_te_target_bar_chart)
-        self.combined_target_variable_combo.currentIndexChanged.connect(self.plot_combined_bar_chart)
         self.only_target_edges_checkbox.toggled.connect(self.plot_time_series_graph)
 
         self.user_guide_action.triggered.connect(self._show_user_guide)
@@ -944,20 +924,6 @@ class MainWindow(QMainWindow):
         self.te_target_variable_combo.setEnabled(bool(var_names))
         self.te_target_variable_combo.blockSignals(False)
 
-        # 更新 TE 目标变量下拉框（用于对比图）
-        current_combined_target_var = self.combined_target_variable_combo.currentData()
-
-        self.combined_target_variable_combo.blockSignals(True)
-        self.combined_target_variable_combo.clear()
-        for name in var_names:
-            self.combined_target_variable_combo.addItem(name, name)
-
-        combined_target_var = current_combined_target_var if current_combined_target_var in var_names else self._get_default_target_name(var_names)
-        if combined_target_var:
-            self.combined_target_variable_combo.setCurrentIndex(self.combined_target_variable_combo.findData(combined_target_var))
-        self.combined_target_variable_combo.setEnabled(bool(var_names))
-        self.combined_target_variable_combo.blockSignals(False)
-
         # 更新 TE 分析时的目标变量下拉框
         self.te_target_combo.blockSignals(True)
         current_te_target = self.te_target_combo.currentData()
@@ -977,7 +943,6 @@ class MainWindow(QMainWindow):
         self.plot_target_influence_graph()
         self.plot_mci_bar_chart()
         self.plot_te_target_bar_chart()
-        self.plot_combined_bar_chart()
 
     def _create_help_label(self, text: str) -> QLabel:
         label = QLabel(text or "")
@@ -1579,7 +1544,7 @@ class MainWindow(QMainWindow):
         self._plot_te_bar_graph(max_te_matrix, max_ndte_matrix, var_names)
         self._refresh_target_variable_options()
         self.plot_te_target_bar_chart()
-        self.plot_combined_bar_chart()
+        self.plot_compare_chart()
 
     def _plot_te_result_graph(self, max_te_matrix: np.ndarray, max_ndte_matrix: np.ndarray, var_names: list[str]) -> None:
         fig = self.te_graph_canvas.fig
@@ -1811,6 +1776,12 @@ class MainWindow(QMainWindow):
             # TE 结果标签页
             self.export_result_button.setText("导出 TE 结果")
             self.export_result_button.setEnabled(self.current_te_result is not None)
+        elif tab_index == 2:
+            # TE/PCMCI+ 结果对比标签页
+            self.export_result_button.setText("导出对比图")
+            self.export_result_button.setEnabled(
+                self.current_result is not None and self.current_te_result is not None
+            )
 
     def _show_advanced_constraint_dialog(self) -> None:
         """显示高级边约束设置对话框。"""
@@ -1943,6 +1914,27 @@ class MainWindow(QMainWindow):
             self._show_pcmci_export_dialog()
         elif current_tab == 1:
             self._show_te_export_dialog()
+        elif current_tab == 2:
+            self._export_compare_chart()
+
+    def _export_compare_chart(self) -> None:
+        """导出 TE/PCMCI+ 对比图为图片。"""
+
+        if self.current_result is None or self.current_te_result is None:
+            QMessageBox.warning(self, "提示", "需要同时有 PCMCI+ 和 TE 结果才能导出对比图。")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "导出对比图", "TE_PCMCI+_对比图.png",
+            "PNG Files (*.png);;PDF Files (*.pdf);;SVG Files (*.svg)",
+        )
+        if not file_path:
+            return
+        try:
+            self.compare_canvas.fig.savefig(file_path, dpi=200, bbox_inches="tight")
+            QMessageBox.information(self, "完成", f"对比图已导出到：\n{file_path}")
+        except Exception as exc:
+            QMessageBox.critical(self, "错误", f"导出失败：{exc}")
 
     def _show_pcmci_export_dialog(self) -> None:
         """显示 PCMCI+ 结果导出对话框。"""
@@ -2368,6 +2360,8 @@ class MainWindow(QMainWindow):
         self.adj_table.resizeColumnsToContents()
 
     def _build_mci_summary_matrix(self) -> np.ndarray:
+        """构建 MCI 摘要矩阵：取各滞后期中绝对值最大的值（保留符号）。"""
+
         if self.current_result is None:
             return np.empty((0, 0))
 
@@ -2381,7 +2375,14 @@ class MainWindow(QMainWindow):
             [self.current_result.val_matrix[:, :, tau] for tau in tau_list],
             axis=2,
         )
-        return np.max(stacked, axis=2)
+        # 取绝对值最大的值（保留符号），而非单纯取最大值
+        abs_stacked = np.abs(stacked)
+        max_abs_idx = np.argmax(abs_stacked, axis=2)
+        # 根据索引提取对应的原始值（保留符号）
+        i_idx, j_idx = np.meshgrid(
+            np.arange(stacked.shape[0]), np.arange(stacked.shape[1]), indexing="ij"
+        )
+        return stacked[i_idx, j_idx, max_abs_idx]
 
     def display_mci_matrix(self) -> None:
         if self.current_result is None:
@@ -2546,45 +2547,94 @@ class MainWindow(QMainWindow):
         apply_colorbar_theme(self.te_target_bar_canvas.fig)
         self.te_target_bar_canvas.draw()
 
-    def plot_combined_bar_chart(self) -> None:
+    def plot_compare_chart(self) -> None:
+        """绘制 PCMCI+ MCI 与 TE 的联合对比柱状图。"""
+
         if self.current_result is None or self.current_te_result is None:
             return
 
-        pcmci_var_names = self.current_result.var_names
-        te_var_names = self.current_te_result.var_names
-
-        target_name = str(self.combined_target_variable_combo.currentData() or "")
+        # 获取目标变量名
+        target_name = str(self.te_target_variable_combo.currentData() or "")
         if not target_name:
-            target_name = self._get_default_target_name(pcmci_var_names)
+            target_name = self._get_default_target_name(self.current_result.var_names)
 
-        if target_name not in pcmci_var_names:
-            return
+        fig = self.compare_canvas.fig
+        fig.clear()
+        axes = fig.subplots(2, 1, sharex=True)
 
-        self.combined_bar_canvas.clear_figure()
+        font_properties = get_chinese_font_properties()
+        font_kwargs = {"fontproperties": font_properties} if font_properties is not None else {}
 
+        # --- PCMCI+ MCI 数据 ---
+        mci_matrix = self._build_mci_summary_matrix()
+        pcmci_var_names = self.current_result.var_names
+        mci_values: dict[str, float] = {}
+        if target_name in pcmci_var_names:
+            target_idx = pcmci_var_names.index(target_name)
+            for i, name in enumerate(pcmci_var_names):
+                if i != target_idx:
+                    mci_values[name] = float(mci_matrix[i, target_idx])
+
+        # --- TE 数据（与 TE 柱状图一致，使用 tau_max 滞后期的值） ---
+        te_result = self.current_te_result
+        te_var_names = te_result.var_names
+        tau_max = te_result.config.tau_max
+        te_values: dict[str, float] = {}
         if target_name in te_var_names:
-            draw_combined_bar_chart(
-                ax=self.combined_bar_canvas.axes,
-                val_matrix=self.current_result.val_matrix,
-                p_matrix=self.current_result.p_matrix,
-                te_matrix=self.current_te_result.te_matrix,
-                ndte_matrix=self.current_te_result.ndte_matrix,
-                pcmci_var_names=pcmci_var_names,
-                te_var_names=te_var_names,
-                target_name=target_name,
-                tau_min=self.current_result.config.tau_min,
-                tau_max=self.current_result.config.tau_max,
-                pc_alpha=self.current_result.config.alpha,
-            )
-            apply_colorbar_theme(self.combined_bar_canvas.fig)
-        else:
-            ax = self.combined_bar_canvas.axes
-            ax.text(0.5, 0.5, f"目标变量 '{target_name}' 不在 TE 分析结果中。\n请先执行 TE 分析。",
-                   ha="center", va="center", fontsize=12, transform=ax.transAxes)
-            ax.set_xticks([])
-            ax.set_yticks([])
+            target_idx = te_var_names.index(target_name)
+            for i, name in enumerate(te_var_names):
+                if i != target_idx:
+                    te_values[name] = float(te_result.te_matrix[i, target_idx, tau_max])
 
-        self.combined_bar_canvas.draw()
+        # --- 合并横坐标标签（并集） ---
+        all_names = sorted(set(mci_values.keys()) | set(te_values.keys()))
+        x = np.arange(len(all_names))
+        width = 0.5
+
+        # 上子图：MCI（正值橙色，负值蓝色，均从0向上显示绝对值）
+        mci_vals = [mci_values.get(name, 0.0) for name in all_names]
+        mci_abs = [abs(v) for v in mci_vals]
+        mci_colors = ['#1f77b4' if v < 0 else '#ff7f0e' for v in mci_vals]
+        bars_mci = axes[0].bar(x, mci_abs, width, color=mci_colors, alpha=0.85, edgecolor="white", linewidth=0.6)
+
+        # 图例
+        axes[0].legend(handles=[
+            Patch(facecolor='#ff7f0e', label='Positive (正值)'),
+            Patch(facecolor='#1f77b4', label='Negative (负值)'),
+        ])
+
+        # 标注数值和正负号
+        for bar, raw_val, abs_val in zip(bars_mci, mci_vals, mci_abs):
+            if abs_val > 0.01:
+                sign = "+" if raw_val >= 0 else "-"
+                axes[0].text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                             f"{sign}{abs_val:.3f}", ha="center", va="bottom", fontsize=8, **font_kwargs)
+
+        axes[0].set_ylabel("MCI 值 (绝对值)", fontsize=10, **font_kwargs)
+        axes[0].set_title(f"PCMCI+ MCI 值（目标：{target_name}）", fontsize=11, fontweight="bold", **font_kwargs)
+        style_result_axes(axes[0])
+
+        # 下子图：TE
+        te_vals = [te_values.get(name, 0.0) for name in all_names]
+        bars_te = axes[1].bar(x, te_vals, width, color='#d62728', alpha=0.85, edgecolor="white", linewidth=0.6, label="TE")
+        te_labels = [f"{v:.3f}" if v > 0.01 else "" for v in te_vals]
+        for bar, label_text in zip(bars_te, te_labels):
+            if label_text:
+                axes[1].text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                             label_text, ha="center", va="bottom", fontsize=8, **font_kwargs)
+        axes[1].set_ylabel("TE 值", fontsize=10, **font_kwargs)
+        axes[1].set_xlabel("源变量", fontsize=10, **font_kwargs)
+        axes[1].set_title(f"TE 值（目标：{target_name}，lag={tau_max}）", fontsize=11, fontweight="bold", **font_kwargs)
+        axes[1].legend()
+        style_result_axes(axes[1])
+
+        axes[1].set_xticks(x)
+        axes[1].set_xticklabels(all_names, rotation=45, ha='right', fontsize=8, **font_kwargs)
+
+        # 调整布局，确保坐标轴标签完整显示
+        fig.subplots_adjust(left=0.12, right=0.95, top=0.92, bottom=0.18, hspace=0.35)
+        apply_colorbar_theme(fig)
+        self.compare_canvas.draw()
 
 
 # 兼容旧导入路径，避免过渡期间外部模块报错。
