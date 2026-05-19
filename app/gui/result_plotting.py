@@ -1072,8 +1072,6 @@ def draw_te_target_bar_chart(
     ndte_labels: list[str] = []
 
     for src_idx in source_indices:
-        if src_idx == target_idx:
-            continue
         name = var_names[src_idx]
         # 只取最大期次的值
         te_val = float(te_matrix[src_idx, target_idx, tau_max])
