@@ -1050,31 +1050,27 @@ def extract_mci_info(
     target_idx = var_names.index(target_name)
     source_indices = list(range(len(var_names)))
 
+    # 确定最大索引（确保不越界）
+    max_lag = val_matrix.shape[2] - 1
+    lag_idx = min(tau_max, max_lag)
+
     mci_info = {}
     for src_idx in source_indices:
+        if src_idx == target_idx:
+            continue
         name = var_names[src_idx]
         best_val = 0.0
-        best_tau = -1
 
-        for tau in range(max(1, tau_min), tau_max + 1):
+        for tau in range(max(1, tau_min), lag_idx + 1):
             val = float(val_matrix[src_idx, target_idx, tau])
-            p_val = float(p_matrix[src_idx, target_idx, tau])
-            if p_val > pc_alpha:
-                continue
-
             if abs(val) > abs(best_val):
                 best_val = val
-                best_tau = tau
 
         tau0_val = float(val_matrix[src_idx, target_idx, 0])
-        tau0_p = float(p_matrix[src_idx, target_idx, 0])
-        if src_idx != target_idx and tau0_p <= pc_alpha:
-            if abs(tau0_val) > abs(best_val):
-                best_val = tau0_val
-                best_tau = 0
+        if abs(tau0_val) > abs(best_val):
+            best_val = tau0_val
 
-        if best_tau >= 0:
-            mci_info[name] = abs(best_val)
+        mci_info[name] = abs(best_val)
 
     return mci_info
 
@@ -1093,14 +1089,26 @@ def extract_te_info(
     target_idx = var_names.index(target_name)
     source_indices = list(range(len(var_names)))
 
+    # 确定最大索引（确保不越界）
+    max_lag = te_matrix.shape[2] - 1
+    lag_idx = min(tau_max, max_lag)
+
     te_info = {}
     for src_idx in source_indices:
         if src_idx == target_idx:
             continue
         name = var_names[src_idx]
-        te_val = float(te_matrix[src_idx, target_idx, tau_max])
-        ndte_val = float(ndte_matrix[src_idx, target_idx, tau_max])
-        te_info[name] = (te_val, ndte_val)
+        # 从所有滞后期中找到最大值（就像 TE 柱状图那样）
+        max_te = 0.0
+        max_ndte = 0.0
+        for lag in range(1, lag_idx + 1):
+            te_val = float(te_matrix[src_idx, target_idx, lag])
+            ndte_val = float(ndte_matrix[src_idx, target_idx, lag])
+            if te_val > max_te:
+                max_te = te_val
+            if ndte_val > max_ndte:
+                max_ndte = ndte_val
+        te_info[name] = (max_te, max_ndte)
 
     return te_info
 
@@ -1128,6 +1136,14 @@ def draw_combined_bar_chart(
     all_vars = set(mci_info.keys()) | set(te_info.keys())
     all_vars = [v for v in all_vars if v != target_name]
     all_vars.sort()
+
+    if not all_vars:
+        font_prop = get_chinese_font_properties()
+        ax.text(0.5, 0.5, "没有可用的对比数据", ha='center', va='center', 
+                fontsize=12, fontproperties=font_prop)
+        ax.set_title(f"MCI vs TE/NDTE 对比（目标：{target_name}）", fontsize=11, fontweight="bold", fontproperties=font_prop, pad=10)
+        ax.axis('off')
+        return
 
     mci_values = [mci_info.get(v, 0.0) for v in all_vars]
     te_values = [te_info.get(v, (0.0, 0.0))[0] for v in all_vars]
