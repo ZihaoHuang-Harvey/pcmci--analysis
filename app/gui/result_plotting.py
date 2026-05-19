@@ -1034,6 +1034,142 @@ def draw_mci_bar_chart(
     style_result_axes(ax)
 
 
+def extract_mci_info(
+    val_matrix: np.ndarray,
+    p_matrix: np.ndarray,
+    var_names: list[str],
+    target_name: str,
+    tau_min: int,
+    tau_max: int,
+    pc_alpha: float,
+) -> dict:
+    """从 MCI 数据中提取变量信息，用于对比。"""
+    if target_name not in var_names:
+        return {}
+
+    target_idx = var_names.index(target_name)
+    source_indices = list(range(len(var_names)))
+
+    mci_info = {}
+    for src_idx in source_indices:
+        name = var_names[src_idx]
+        best_val = 0.0
+        best_tau = -1
+
+        for tau in range(max(1, tau_min), tau_max + 1):
+            val = float(val_matrix[src_idx, target_idx, tau])
+            p_val = float(p_matrix[src_idx, target_idx, tau])
+            if p_val > pc_alpha:
+                continue
+
+            if abs(val) > abs(best_val):
+                best_val = val
+                best_tau = tau
+
+        tau0_val = float(val_matrix[src_idx, target_idx, 0])
+        tau0_p = float(p_matrix[src_idx, target_idx, 0])
+        if src_idx != target_idx and tau0_p <= pc_alpha:
+            if abs(tau0_val) > abs(best_val):
+                best_val = tau0_val
+                best_tau = 0
+
+        if best_tau >= 0:
+            mci_info[name] = abs(best_val)
+
+    return mci_info
+
+
+def extract_te_info(
+    te_matrix: np.ndarray,
+    ndte_matrix: np.ndarray,
+    var_names: list[str],
+    target_name: str,
+    tau_max: int,
+) -> dict:
+    """从 TE 数据中提取变量信息，用于对比。"""
+    if target_name not in var_names:
+        return {}
+
+    target_idx = var_names.index(target_name)
+    source_indices = list(range(len(var_names)))
+
+    te_info = {}
+    for src_idx in source_indices:
+        if src_idx == target_idx:
+            continue
+        name = var_names[src_idx]
+        te_val = float(te_matrix[src_idx, target_idx, tau_max])
+        ndte_val = float(ndte_matrix[src_idx, target_idx, tau_max])
+        te_info[name] = (te_val, ndte_val)
+
+    return te_info
+
+
+def draw_combined_bar_chart(
+    ax,
+    val_matrix: np.ndarray,
+    p_matrix: np.ndarray,
+    te_matrix: np.ndarray,
+    ndte_matrix: np.ndarray,
+    var_names: list[str],
+    target_name: str,
+    tau_min: int,
+    tau_max: int,
+    pc_alpha: float,
+) -> None:
+    """绘制 MCI 和 TE/NDTE 的联合对比柱状图。"""
+    if target_name not in var_names:
+        raise ValueError(f"目标变量 {target_name} 不在分析结果中。")
+
+    mci_info = extract_mci_info(val_matrix, p_matrix, var_names, target_name, tau_min, tau_max, pc_alpha)
+    te_info = extract_te_info(te_matrix, ndte_matrix, var_names, target_name, tau_max)
+
+    # 获取变量并集（排除目标变量）
+    all_vars = set(mci_info.keys()) | set(te_info.keys())
+    all_vars = [v for v in all_vars if v != target_name]
+    all_vars.sort()
+
+    mci_values = [mci_info.get(v, 0.0) for v in all_vars]
+    te_values = [te_info.get(v, (0.0, 0.0))[0] for v in all_vars]
+    ndte_values = [te_info.get(v, (0.0, 0.0))[1] for v in all_vars]
+
+    x = np.arange(len(all_vars))
+    width = 0.25
+
+    font_prop = get_chinese_font_properties()
+
+    bars_mci = ax.bar(x - width, mci_values, width, color=THEME_COLORS["accent"], alpha=0.85, edgecolor="white", linewidth=0.6, label="MCI")
+    bars_te = ax.bar(x, te_values, width, color='#d62728', alpha=0.85, edgecolor="white", linewidth=0.6, label="TE")
+    bars_ndte = ax.bar(x + width, ndte_values, width, color='#1f77b4', alpha=0.85, edgecolor="white", linewidth=0.6, label="NDTE")
+
+    for bar in bars_mci:
+        height = bar.get_height()
+        if height > 0.01:
+            ax.text(bar.get_x() + bar.get_width() / 2, height, f"{height:.3f}", ha="center", va="bottom", fontsize=7, fontproperties=font_prop)
+
+    for bar in bars_te:
+        height = bar.get_height()
+        if height > 0.01:
+            ax.text(bar.get_x() + bar.get_width() / 2, height, f"{height:.3f}", ha="center", va="bottom", fontsize=7, fontproperties=font_prop)
+
+    for bar in bars_ndte:
+        height = bar.get_height()
+        if height > 0.01:
+            ax.text(bar.get_x() + bar.get_width() / 2, height, f"{height:.3f}", ha="center", va="bottom", fontsize=7, fontproperties=font_prop)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(all_vars, rotation=45, ha='right', fontsize=7.5, fontproperties=font_prop)
+
+    ax.set_ylabel("值", fontsize=10, fontproperties=font_prop)
+    ax.set_title(f"MCI vs TE/NDTE 对比（目标：{target_name}）", fontsize=11, fontweight="bold", fontproperties=font_prop, pad=10)
+
+    ax.legend(loc="upper right", fontsize=9, framealpha=0.9)
+    ax.set_ylim(bottom=0)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    style_result_axes(ax)
+
+
 def draw_te_target_bar_chart(
     ax,
     te_matrix: np.ndarray,
