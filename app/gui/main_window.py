@@ -2550,24 +2550,40 @@ class MainWindow(QMainWindow):
         if self.current_result is None or self.current_te_result is None:
             return
 
+        pcmci_var_names = self.current_result.var_names
+        te_var_names = self.current_te_result.var_names
+
         target_name = str(self.combined_target_variable_combo.currentData() or "")
         if not target_name:
-            target_name = self._get_default_target_name(self.current_result.var_names)
+            target_name = self._get_default_target_name(pcmci_var_names)
+
+        if target_name not in pcmci_var_names:
+            return
 
         self.combined_bar_canvas.clear_figure()
-        draw_combined_bar_chart(
-            ax=self.combined_bar_canvas.axes,
-            val_matrix=self.current_result.val_matrix,
-            p_matrix=self.current_result.p_matrix,
-            te_matrix=self.current_te_result.te_matrix,
-            ndte_matrix=self.current_te_result.ndte_matrix,
-            var_names=self.current_result.var_names,
-            target_name=target_name,
-            tau_min=self.current_result.config.tau_min,
-            tau_max=self.current_result.config.tau_max,
-            pc_alpha=self.current_result.config.alpha,
-        )
-        apply_colorbar_theme(self.combined_bar_canvas.fig)
+
+        if target_name in te_var_names:
+            draw_combined_bar_chart(
+                ax=self.combined_bar_canvas.axes,
+                val_matrix=self.current_result.val_matrix,
+                p_matrix=self.current_result.p_matrix,
+                te_matrix=self.current_te_result.te_matrix,
+                ndte_matrix=self.current_te_result.ndte_matrix,
+                pcmci_var_names=pcmci_var_names,
+                te_var_names=te_var_names,
+                target_name=target_name,
+                tau_min=self.current_result.config.tau_min,
+                tau_max=self.current_result.config.tau_max,
+                pc_alpha=self.current_result.config.alpha,
+            )
+            apply_colorbar_theme(self.combined_bar_canvas.fig)
+        else:
+            ax = self.combined_bar_canvas.axes
+            ax.text(0.5, 0.5, f"目标变量 '{target_name}' 不在 TE 分析结果中。\n请先执行 TE 分析。",
+                   ha="center", va="center", fontsize=12, transform=ax.transAxes)
+            ax.set_xticks([])
+            ax.set_yticks([])
+
         self.combined_bar_canvas.draw()
 
 
