@@ -999,7 +999,7 @@ def draw_mci_bar_chart(
                 best_color = THEME_COLORS["accent"] if tau0_val > 0 else THEME_COLORS["negative"]
 
         if best_tau >= 0:
-            display_names.append(f"{name} (t{best_tau})" if best_tau > 0 else f"{name} (t0)")
+            display_names.append(name)
             mci_values.append(abs(best_val))
             bar_labels.append(best_label)
             bar_colors.append(best_color)
