@@ -47,3 +47,6 @@ outputs/
 # Pickle results
 *.pkl
 *.pickle
+
+# Software copyright application materials
+软件著作权申请资料/
