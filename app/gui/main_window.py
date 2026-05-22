@@ -1705,7 +1705,7 @@ class MainWindow(QMainWindow):
         line_width_scale = 2.0
         marker_scale = 1.8
         for ax in fig_copy.axes:
-            # 放大所有文本对象（包括数据标签、注解等）
+            # 放大文字
             for text_obj in ax.texts:
                 current_size = text_obj.get_fontsize()
                 if current_size is not None and current_size > 0:
@@ -1726,23 +1726,6 @@ class MainWindow(QMainWindow):
                     current_size = axis_label.get_fontsize()
                     if current_size is not None and current_size > 0:
                         axis_label.set_fontsize(current_size * font_scale)
-            # 放大图例文本
-            legend = ax.get_legend()
-            if legend:
-                for text in legend.get_texts():
-                    current_size = text.get_fontsize()
-                    if current_size is not None and current_size > 0:
-                        text.set_fontsize(current_size * font_scale)
-                # 放大图例标题
-                if legend.get_title():
-                    current_size = legend.get_title().get_fontsize()
-                    if current_size is not None and current_size > 0:
-                        legend.get_title().set_fontsize(current_size * font_scale)
-            # 放大注解文本
-            for annotation in ax.annotations:
-                current_size = annotation.get_fontsize()
-                if current_size is not None and current_size > 0:
-                    annotation.set_fontsize(current_size * font_scale)
 
             # 放大普通线条
             for line in ax.lines:
@@ -1779,13 +1762,6 @@ class MainWindow(QMainWindow):
                                 patch.set_markersize(ms * marker_scale)
                         except Exception:
                             pass
-
-        # 放大整个图形的 suptitle（如果有的话）
-        if hasattr(fig_copy, 'suptitle') and fig_copy._suptitle is not None:
-            suptitle_text = fig_copy._suptitle
-            current_size = suptitle_text.get_fontsize()
-            if current_size is not None and current_size > 0:
-                suptitle_text.set_fontsize(current_size * font_scale)
 
         popup_canvas = FigureCanvas(fig_copy)
         popup_canvas.draw()
